@@ -1,0 +1,7 @@
+google-api-python-client
+python-dotenv
+fastapi
+uvicorn
+sqlalchemy
+pydantic-settings
+google-auth-oauthlib
