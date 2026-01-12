@@ -1,58 +1,55 @@
-import uvicorn
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional, List
-from datetime import datetime, date, timedelta
+from fastapi import FastAPI, Depends, HTTPException, Body, status, APIRouter
 from sqlalchemy.orm import Session
-from starlette.responses import RedirectResponse
-import os
-import re
-import random
+from .database import SessionLocal, engine, Base
+from . import models, schemas
+from .youtube_service import youtube_service
+from .tiktok_service import tiktok_service
+from .gemini_service import gemini_service
+from .data_analytics_gemini_service import data_analytics_service
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer
+from typing import List, Optional
+import logging
 
-from .config import get_settings
-from .models import Base, User, Credential, Post
-from .database import engine, SessionLocal, get_db
-from .api_services import get_api_service, API_SERVICES, YoutubeApiService
+# Configuração de logs
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-settings = get_settings()
-print(f"DEBUG: Loaded Settings: YOUTUBE_CLIENT_ID={settings.YOUTUBE_CLIENT_ID}, YOUTUBE_CLIENT_SECRET={'*' * len(settings.YOUTUBE_CLIENT_SECRET) if settings.YOUTUBE_CLIENT_SECRET else 'None'}, YOUTUBE_REDIRECT_URI={settings.YOUTUBE_REDIRECT_URI}")
-
-# Cria as tabelas no banco de dados
+# Cria as tabelas no banco de dados se não existirem
+print("Creating database tables...")
 Base.metadata.create_all(bind=engine)
 
-# --- USUÁRIO TESTE INICIAL (Provisório) ---
-with SessionLocal() as db:
-    if not db.query(User).filter(User.username == "testuser").first():
-        hashed_password = "testpassword"
-        db_user = User(username="testuser", hashed_password=hashed_password)
-        db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
-        print("Usuário de teste 'testuser' criado.")
-    else:
-        print("Usuário de teste 'testuser' já existe.")
-
-# --- SCHEMAS (PYDANTIC) ---
-class PostCreate(BaseModel):
-    platform: str
-    title: str
-    url: Optional[str] = ""
-    description: Optional[str] = ""
-    tags: Optional[str] = ""
-    status: Optional[str] = "postado"
-    cover_image: Optional[str] = None
-
-class PostOut(PostCreate):
-    id: int
-    created_at: datetime
-    # As métricas serão adicionadas dinamicamente
-    class Config:
-        from_attributes = True
-
-# --- APP FASTAPI ---
 app = FastAPI()
 
+# Dependência para obter a sessão do banco de dados
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# --- LÓGICA DE AUTENTICAÇÃO INTEGRADA ---
+# Como o arquivo auth.py não existe, mantemos a lógica aqui para garantir o funcionamento.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+
+def get_current_user(db: Session = Depends(get_db)):
+    # Lógica simplificada para o usuário de teste 'testuser'
+    user = db.query(models.User).filter(models.User.username == "testuser").first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+auth_router = APIRouter()
+
+@auth_router.post("/login")
+def login(db: Session = Depends(get_db)):
+    # Retorna um token fictício para o ambiente de teste
+    return {"access_token": "fake-token", "token_type": "bearer"}
+
+# ---------------------------------------
+
+# Configuração CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -61,374 +58,861 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/hello")
-def read_root():
-    return {"Hello": "World"}
-
-def get_db():
+# Criação de usuário de teste (se não existir)
+def create_test_user():
     db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# --- Autenticação Dinâmica ---
-@app.get("/auth/{platform}/login")
-async def login_for_platform(platform: str, db: Session = Depends(get_db)):
-    print(f"DEBUG: Acessado /auth/{platform}/login")
-    if platform not in API_SERVICES:
-        print(f"DEBUG: Plataforma '{platform}' não suportada.")
-        raise HTTPException(status_code=400, detail=f"Plataforma '{platform}' não suportada.")
-    
-    # Assumindo um único usuário de teste por enquanto
-    user = db.query(User).filter(User.username == "testuser").first()
-    if not user:
-        print("DEBUG: Usuário de teste não encontrado.")
-        raise HTTPException(status_code=404, detail="Usuário de teste não encontrado.")
-
-    service = get_api_service(platform, user.id)
-    if not service:
-        print("DEBUG: Erro ao inicializar serviço de API.")
-        raise HTTPException(status_code=500, detail="Erro ao inicializar serviço de API.")
-
-    print(f"DEBUG: Obtendo URL de autorização para user_id: {user.id}")
-    auth_url = service.get_authorization_url(user.id)
-    print(f"DEBUG: URL de autorização gerada: {auth_url}")
-    return RedirectResponse(auth_url)
-
-@app.get("/auth/{platform}/callback")
-async def auth_callback(platform: str, code: str = None, state: str = None, error: str = None, db: Session = Depends(get_db)):
-    print(f"DEBUG: Acessado /auth/{platform}/callback com code={code}, state={state}, error={error}")
-    if error:
-        print(f"DEBUG: Erro de autorização: {error}")
-        raise HTTPException(status_code=400, detail=f"Erro de autorização: {error}")
-    if not code:
-        print("DEBUG: Código de autorização não recebido.")
-        raise HTTPException(status_code=400, detail="Código de autorização não recebido.")
-
-    # Constrói a URL completa de resposta para o fluxo do Google OAuth
-    auth_response_url = f"{settings.YOUTUBE_REDIRECT_URI}?state={state}&code={code}"
-
-    service = get_api_service(platform, int(state)) # state contém o user_id
-    if not service:
-        print("DEBUG: Erro ao inicializar serviço de API no callback.")
-        raise HTTPException(status_code=500, detail="Erro ao inicializar serviço de API.")
-    
-    try:
-        user_id_from_state = int(state) # Extrai o user_id do state
-        credential = service.fetch_and_store_token(auth_response_url, db, user_id_from_state)
-        print(f"DEBUG: Autenticação {platform} concluída com sucesso para o user_id {user_id_from_state}.")
-        # Redirecionar para o frontend ou para uma página de sucesso
-        # TODO: Definir URL de sucesso no frontend
-        return RedirectResponse(url="https://localhost:5173/dashboard", status_code=302)
-    except Exception as e:
-        print(f"DEBUG: Erro ao processar callback de autenticação: {e}")
-        raise HTTPException(status_code=500, detail=f"Erro ao processar callback de autenticação: {e}")
-
-@app.get("/posts")
-def get_posts(skip: int = 0, limit: int = 50, platform: str = None, db: Session = Depends(get_db)):
-    query = db.query(Post)
-    if platform:
-        query = query.filter(Post.platform == platform)
-    
-    posts_from_db = query.order_by(Post.created_at.desc()).offset(skip).limit(limit).all()
-    
-    # "Achata" a resposta para combinar com o que o frontend espera
-    results = []
-    for post in posts_from_db:
-        post_data = PostOut.from_orm(post).dict()
-        post_data.update(post.metrics) # Adiciona as métricas ao nível principal
-        results.append(post_data)
-        
-    return results
-
-@app.post("/posts", response_model=PostOut)
-def create_post(post: PostCreate, db: Session = Depends(get_db)):
-    if 'youtube' in post.platform:
-        initial_metrics = YoutubeApiService.get_public_video_stats(post.url)
+    if not db.query(models.User).filter(models.User.username == "testuser").first():
+        test_user = models.User(username="testuser", email="test@example.com", hashed_password="hashed_password")
+        db.add(test_user)
+        db.commit()
+        print("Test user 'testuser' created.")
     else:
-        initial_metrics = {
-            "views": random.randint(100, 50000),
-            "likes": random.randint(10, 5000),
-            "comments": random.randint(0, 200),
-            "last_updated": datetime.now().isoformat()
-        }
+        print("Test user 'testuser' already exists.")
+    db.close()
+
+create_test_user()
+
+# Inclui as rotas de autenticação
+app.include_router(auth_router, prefix="/auth")
+
+@app.get("/api/status")
+def read_root():
+    return {"status": "Backend is running", "youtube": True, "tiktok": True, "instagram": False}
+
+# --- Rotas de Posts (Dashboard & Biblioteca) ---
+
+@app.get("/posts", response_model=List[schemas.Post])
+def get_posts(platform: str = None, db: Session = Depends(get_db)):
+    query = db.query(models.Post)
+    if platform:
+        if platform.lower() == 'youtube':
+            # Filtro inteligente: Traz Longos, Shorts e o genérico 'youtube'
+            query = query.filter(models.Post.platform.in_(['youtube', 'youtube_long', 'youtube_shorts']))
+        else:
+            # Filtro flexível para outras plataformas (ex: tiktok, instagram)
+            query = query.filter(models.Post.platform.like(f"%{platform}%"))
     
-    db_post = Post(
-        **post.dict(),
-        metrics=initial_metrics
-    )
+    # Ordena sempre do mais recente para o mais antigo
+    return query.order_by(models.Post.published_at.desc()).all()
+
+@app.post("/posts", response_model=schemas.Post)
+def create_post(post: schemas.PostCreate, db: Session = Depends(get_db)):
+    db_post = models.Post(**post.model_dump())
     db.add(db_post)
     db.commit()
     db.refresh(db_post)
-
-    # Retorna o post com a estrutura achatada
-    post_data = PostOut.from_orm(db_post).dict()
-    post_data.update(db_post.metrics)
-    return post_data
-
-@app.put("/posts/{post_id}/refresh")
-def refresh_metrics(post_id: int, db: Session = Depends(get_db)):
-    post = db.query(Post).filter(Post.id == post_id).first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    
-    if 'youtube' in post.platform:
-        new_metrics = YoutubeApiService.get_public_video_stats(post.url)
-    else:
-        new_metrics = {
-            "views": random.randint(100, 50000),
-            "likes": random.randint(10, 5000),
-            "comments": random.randint(0, 200),
-            "last_updated": datetime.now().isoformat()
-        }
-    
-    post.metrics = new_metrics
-    db.commit()
-    return {"status": "updated", "metrics": new_metrics}
+    return db_post
 
 @app.delete("/posts/{post_id}")
 def delete_post(post_id: int, db: Session = Depends(get_db)):
-    post = db.query(Post).filter(Post.id == post_id).first()
+    post = db.query(models.Post).filter(models.Post.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
     db.delete(post)
     db.commit()
-    return {"status": "deleted"}
+    return {"ok": True}
+
+# --- Rotas de Detalhes do Post (Modal) ---
+
+@app.get("/api/posts/{post_id}/analytics")
+def get_post_analytics(post_id: int, db: Session = Depends(get_db)):
+    post = db.query(models.Post).filter(models.Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Métricas base (Realtime do Banco de Dados - Data API)
+    # Estas são as mesmas exibidas no Card da Biblioteca
+    base_metrics = {
+        "views": post.metrics.get("views", 0),
+        "likes": post.metrics.get("likes", 0),
+        "comments": post.metrics.get("comments", 0),
+        "shares": post.metrics.get("shares", 0),
+    }
+
+    # Se for YouTube, tenta buscar dados profundos na API Analytics
+    if "youtube" in post.platform:
+        try:
+            # Tenta buscar dados reais do Analytics (Retenção, etc)
+            analytics_data = youtube_service.get_video_analytics(db, post.platform_content_id)
+            
+            # Se a API retornar erro ou mensagem (ex: vídeo muito recente), usa apenas base_metrics
+            if "error" in analytics_data or "message" in analytics_data:
+                print(f"[Fallback] YouTube Analytics indisponível para {post_id}: {analytics_data}")
+                return {
+                    **base_metrics,
+                    "averageViewDuration": 0,
+                    "averageViewPercentage": 0,
+                    "subscribersGained": post.metrics.get("subscribers_gained", 0),
+                    "fallback": True
+                }
+            
+            # MERGE INTELIGENTE:
+            # Usa métricas realtime do banco (views, likes, comments) para evitar discrepância
+            # Usa métricas profundas do Analytics (retenção, subs ganhos, shares se disponível)
+            
+            merged_data = {
+                # Dados Analíticos (Prioridade para o que vem da API de Relatórios)
+                "averageViewDuration": analytics_data.get("averageViewDuration", 0),
+                "averageViewPercentage": analytics_data.get("averageViewPercentage", 0),
+                "subscribersGained": analytics_data.get("subscribersGained", 0),
+                "estimatedMinutesWatched": analytics_data.get("estimatedMinutesWatched", 0),
+                
+                # Dados Básicos (Prioridade para o Banco/Data API que é mais atualizado)
+                # O Analytics tem delay de ~48h, então seus views quase sempre estarão defasados
+                "views": base_metrics["views"],
+                "likes": base_metrics["likes"],
+                "comments": base_metrics["comments"],
+                
+                # Shares é um caso especial: Data API não traz shares (retorna 0 geralmente), 
+                # mas Analytics traz. Então preferimos Analytics se for maior que 0.
+                "shares": analytics_data.get("shares", 0) if analytics_data.get("shares", 0) > 0 else base_metrics["shares"],
+                
+                "source": "merged_realtime_analytics"
+            }
+            
+            return merged_data
+            
+        except Exception as e:
+            logger.error(f"Erro ao buscar analytics do YouTube para {post_id}: {e}")
+            # Fallback seguro
+            return {
+                **base_metrics,
+                "fallback": True
+            }
+
+    # Para TikTok/Instagram, retornamos as métricas que já temos no banco
+    # (Futuramente podemos conectar com serviços de analytics dessas plataformas)
+    return {
+        **base_metrics,
+        "saves": post.metrics.get("saves", 0),
+        "averageViewDuration": 0,
+        "averageViewPercentage": 0,
+        "platform": post.platform
+    }
+
+@app.post("/api/posts/{post_id}/insight")
+async def generate_post_insight(post_id: int, db: Session = Depends(get_db)):
+    post = db.query(models.Post).filter(models.Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Calcular métricas derivadas para dar contexto à IA
+    views = post.metrics.get('views', 0)
+    likes = post.metrics.get('likes', 0)
+    comments = post.metrics.get('comments', 0)
+    shares = post.metrics.get('shares', 0)
+    subs = post.metrics.get('subscribers_gained', 0)
+    
+    engagement_rate = ((likes + comments + shares) / views * 100) if views > 0 else 0
+    conversion_rate = (subs / views * 100) if views > 0 else 0
+    
+    context = f"""
+    PLATAFORMA: {post.platform.upper()}
+    DATA PUBLICAÇÃO: {post.published_at.strftime('%d/%m/%Y') if post.published_at else 'N/A'}
+    TÍTULO: "{post.title}"
+    TAGS: "{post.tags or 'Nenhuma'}"
+    DESCRIÇÃO COMPLETA: "{post.description[:2000] if post.description else 'Sem descrição'}..."
+    
+    DADOS DE PERFORMANCE:
+    - Views: {views}
+    - Likes: {likes}
+    - Comentários: {comments}
+    - Compartilhamentos: {shares}
+    - Taxa de Engajamento: {engagement_rate:.2f}%
+    - Inscritos Ganhos (Conversão): {subs} ({conversion_rate:.2f}%)
+    """
+    
+    system_instruction = """
+    ATUE COMO UM ESTRATEGISTA DE ELITE (Nível McKinsey/Viral Expert).
+    Sua missão é entregar um relatório de inteligência densa e visual.
+    
+    Gere um JSON ESTRITO com esta estrutura exata:
+    
+    {
+        "verdict_badge": "Rótulo de Impacto (Ex: 'VIRAL', 'CONSTANTE', 'CUIDADO', 'OPOUTUNIDADE')",
+        "verdict_color": "Hex code (Ex: '#3bf5a5', '#f43f5e')",
+        "score": 85, 
+        "hook_analysis": "Análise afiada de 1 frase sobre a retenção inicial.",
+        "psychological_trigger": "Nome do Gatilho (Ex: Curiosidade, Medo, Ganância)",
+        "diagnosis_points": [
+            { 
+                "title": "Atração (Topo)", 
+                "content": "Resumo de 1 frase do problema ou acerto.", 
+                "sentiment": "negative" (ou 'positive'/'neutral'),
+                "icon": "eye"
+            },
+            { 
+                "title": "Retenção (Meio)", 
+                "content": "Resumo de 1 frase.", 
+                "sentiment": "neutral",
+                "icon": "clock"
+            },
+            { 
+                "title": "Conversão (Fundo)", 
+                "content": "Resumo de 1 frase.", 
+                "sentiment": "negative",
+                "icon": "users"
+            },
+            { 
+                "title": "Autoridade (Branding)", 
+                "content": "Resumo de 1 frase.", 
+                "sentiment": "positive",
+                "icon": "star"
+            }
+        ],
+        "actionable_steps": [
+            "Ação Prática 1 (Prioridade Máxima)",
+            "Ação Prática 2 (Ajuste de Conteúdo)",
+            "Ação Prática 3 (Otimização SEO)",
+            "Ação Prática 4 (Engajamento)",
+            "Ação Prática 5 (Design/Thumb)",
+            "Ação Prática 6 (Copywriting)",
+            "Ação Prática 7 (Distribuição)",
+            "Ação Prática 8 (Longo Prazo)"
+        ]
+    }
+    DIRETRIZ: Gere EXATAMENTE 8 actionable_steps. Seja cirúrgico e profissional.
+    """
+    
+    try:
+        # Usa o serviço de IA com a instrução customizada
+        ai_response = await data_analytics_service.analyze_data_with_context(
+            user_prompt=context, 
+            db=db, 
+            custom_system_instruction=system_instruction
+        )
+        return ai_response
+        
+    except Exception as e:
+        logger.error(f"Erro ao gerar insight IA: {e}")
+        return {
+            "verdict_badge": "ERRO IA",
+            "verdict_color": "#ef4444",
+            "score": 0,
+            "hook_analysis": "Não foi possível conectar ao cérebro digital.",
+            "psychological_trigger": "Desconhecido",
+            "funnel_diagnosis": "Falha na análise.",
+            "actionable_step": "Tente novamente."
+        }
+
+@app.post("/api/posts/{post_id}/toggle_pattern")
+def toggle_post_pattern(post_id: int, db: Session = Depends(get_db)):
+    post = db.query(models.Post).filter(models.Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Toggle (se for None assume False -> True)
+    current_status = post.is_pattern if post.is_pattern is not None else False
+    post.is_pattern = not current_status
+    
+    db.commit()
+    db.refresh(post)
+    return {"is_pattern": post.is_pattern}
+
+# --- Rotas de Sincronização ---
+
+@app.get("/api/sync/{platform}")
+async def sync_platform(platform: str, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    logger.info(f"Iniciando sincronização para: {platform}")
+    if platform == 'youtube':
+        try:
+            return await youtube_service.sync_data(user.id, db)
+        except Exception as e:
+            logger.error(f"Erro no sync YouTube: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    elif platform == 'tiktok':
+        try:
+            return await tiktok_service.sync_data(user.id, db)
+        except Exception as e:
+            logger.error(f"Erro no sync TikTok: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {"status": "skipped", "platform": platform, "message": "Sincronização não implementada ainda"}
+
+# --- Rotas de Dashboard (Gráficos) ---
 
 @app.get("/dashboard/summary")
-def get_summary(db: Session = Depends(get_db)):
-    # Lógica de Metas Diárias
+def get_dashboard_summary(db: Session = Depends(get_db)):
+    from datetime import datetime
+    
     today = datetime.now().date()
-    # Para garantir que pegamos todos os posts do dia atual, comparamos com o início do dia e o início do próximo dia
-    today_start = datetime(today.year, today.month, today.day, 0, 0, 0)
-    tomorrow_start = today_start + timedelta(days=1)
+    start_of_day = datetime.combine(today, datetime.min.time())
+    end_of_day = datetime.combine(today, datetime.max.time())
 
-    print(f"DEBUG: get_summary - Today: {today}, Today Start: {today_start}, Tomorrow Start: {tomorrow_start}")
+    # Função auxiliar para contar posts do dia por plataforma
+    def count_today(platform_key):
+        query = db.query(models.Post).filter(
+            models.Post.published_at >= start_of_day,
+            models.Post.published_at <= end_of_day
+        )
+        if platform_key == 'youtube_shorts':
+            return query.filter(models.Post.platform == 'youtube_shorts').count()
+        elif platform_key == 'youtube_long':
+            return query.filter(models.Post.platform == 'youtube_long').count()
+        elif platform_key == 'tiktok':
+            return query.filter(models.Post.platform.like('%tiktok%')).count()
+        elif platform_key == 'instagram':
+            return query.filter(models.Post.platform.like('%instagram%')).count()
+        return 0
 
-    posts_today = db.query(Post).filter(
-        Post.created_at >= today_start,
-        Post.created_at < tomorrow_start
-    ).all()
+    # Lógica de Metas Dinâmica (0=Segunda, 6=Domingo)
+    weekday = today.weekday()
     
-    print(f"DEBUG: get_summary - Posts Today ({len(posts_today)}): {[p.platform for p in posts_today]}")
+    # Regra: Shorts e TikTok (5/dia de Seg-Sex, Fim de semana é 'Off'/Lucro)
+    meta_videos_curtos = 5 if weekday < 5 else 'Off'
+    
+    # Regra: YouTube Longo (1 na Terça(1) e Quinta(3), resto 'Off')
+    meta_youtube_long = 1 if weekday in [1, 3] else 'Off'
 
-    summary = {
-        "shorts": {"current": 0, "goal": 5},
-        "tiktok": {"current": 0, "goal": 5},
-        "youtube_long": {"current": 0, "goal": 0}, # Meta dinâmica dependendo do dia
-        "instagram": {"current": 0, "goal": 0}     # Defina meta se quiser
+    goals = {
+        "shorts": meta_videos_curtos,
+        "tiktok": meta_videos_curtos,
+        "youtube_long": meta_youtube_long,
+        "instagram": meta_videos_curtos 
     }
-    
-    # Define meta de vídeo longo (Terça=1, Quinta=3)
-    weekday = today.weekday() # 0=Seg, 1=Ter, ...
-    if weekday == 1 or weekday == 3: # Terça ou Quinta
-        summary["youtube_long"]["goal"] = 1
-        
-    for p in posts_today:
-        # A plataforma 'youtube_shorts' deve ser contada em 'shorts'
-        # e 'youtube_long' deve ser contada em 'youtube_long'
-        if p.platform == 'youtube_shorts':
-            summary["shorts"]["current"] += 1
-        elif p.platform == 'youtube_long':
-            summary["youtube_long"]["current"] += 1
-        elif p.platform == 'tiktok':
-            summary["tiktok"]["current"] += 1
-        elif p.platform == 'instagram':
-            summary["instagram"]["current"] += 1
-            
-    print(f"DEBUG: get_summary - Final Summary: {summary}")
-    return summary
 
-# --- NOVOS ENDPOINTS PARA GRÁFICOS ---
-@app.get("/dashboard/audience")
-def get_audience_summary(db: Session = Depends(get_db)):
-    # Assumindo um único usuário de teste por enquanto
-    user = db.query(User).filter(User.username == "testuser").first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuário de teste não encontrado.")
-
-    service = get_api_service("youtube", user.id) # Usando o serviço do YouTube
-    if not service:
-        raise HTTPException(status_code=500, detail="Erro ao inicializar serviço de API.")
-
-    # Pega os dados de audiência reais da API do YouTube
-    audience_data = service.get_audience_data(db)
-    
-    # O frontend espera um formato específico, podemos precisar adaptá-lo aqui
-    # Exemplo:
     return {
-        "youtube_long": audience_data.get("youtube_long", {"count": "N/A", "growth": "N/A"}),
-        "youtube_shorts": audience_data.get("youtube_shorts", {"count": "N/A", "growth": "N/A"}),
-        # Outras plataformas não conectadas
-        "tiktok": {"count": 0, "growth": 0},
-        "instagram": {"count": 0, "growth": 0}
+        "shorts": {"current": count_today('youtube_shorts'), "goal": goals['shorts']},
+        "tiktok": {"current": count_today('tiktok'), "goal": goals['tiktok']},
+        "youtube_long": {"current": count_today('youtube_long'), "goal": goals['youtube_long']},
+        "instagram": {"current": count_today('instagram'), "goal": goals['instagram']},
+        "total_posts_today": db.query(models.Post).filter(models.Post.published_at >= start_of_day).count()
     }
+
+@app.get("/dashboard/audience")
+def get_audience_data(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from .models import FollowerHistory
+    
+    print("--- [DEBUG DASHBOARD] Buscando dados de audiência ---")
+    
+    def get_latest(platform):
+        rec = db.query(FollowerHistory).filter(
+            FollowerHistory.user_id == user.id,
+            FollowerHistory.platform == platform,
+            FollowerHistory.is_manual == False
+        ).order_by(FollowerHistory.date.desc()).first()
+        print(f"Latest {platform}: {rec.count if rec else 'None'}")
+        return rec
+
+    yt = get_latest('youtube')
+    tk = get_latest('tiktok')
+    ig = get_latest('instagram')
+
+    from datetime import datetime, timedelta
+    thirty_days_ago = datetime.now() - timedelta(days=30)
+    
+    def get_growth(platform, current_val):
+        if not current_val: return "N/A"
+        past = db.query(FollowerHistory).filter(
+            FollowerHistory.user_id == user.id,
+            FollowerHistory.platform == platform,
+            FollowerHistory.is_manual == False,
+            FollowerHistory.date <= thirty_days_ago
+        ).order_by(FollowerHistory.date.desc()).first()
+        
+        if past and past.count > 0:
+            diff = current_val - past.count
+            return f"+{diff} este mês" if diff > 0 else f"{diff} este mês"
+        return "+0 este mês"
+
+    data = {
+        "youtube_long": {"count": yt.count if yt else 0, "growth": get_growth('youtube', yt.count if yt else 0)},
+        "tiktok": {"count": tk.count if tk else 0, "growth": get_growth('tiktok', tk.count if tk else 0)},
+        "instagram": {"count": ig.count if ig else 0, "growth": get_growth('instagram', ig.count if ig else 0)},
+    }
+    print(f"Payload final Audiência: {data}")
+    return data
 
 @app.get("/dashboard/daily_growth")
-def get_daily_growth(db: Session = Depends(get_db)):
-    from datetime import timedelta
-
-    user = db.query(User).filter(User.username == "testuser").first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuário de teste não encontrado.")
-
-    youtube_service = get_api_service("youtube", user.id)
-    if not youtube_service:
-        return _generate_mock_daily_data(30)
-
-    # Define o período para os últimos 30 dias
-    end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=29)
+def get_daily_growth(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from .models import FollowerHistory
+    from datetime import datetime, timedelta, time
     
-    # A função agora retorna uma lista de dicionários com todas as métricas
-    youtube_daily_data = youtube_service.get_daily_subscriber_growth(db, start_date, end_date)
+    # Respeita o delay de segurança de 3 dias para garantir dados consolidados das APIs
+    # Normaliza para o final do dia para garantir range inclusivo
+    today = datetime.now().date()
+    end_date_ref = today - timedelta(days=3) # ALTERADO: Delay de 3 dias
+    start_date_ref = end_date_ref - timedelta(days=30)
     
-    # Mapeia os dados do YouTube para uma estrutura de dicionário por data
-    # O valor agora é o dicionário de métricas completo
-    youtube_data_map = {entry['date']: entry for entry in youtube_daily_data}
+    # Range de exibição (sem horas)
+    display_start = datetime.combine(start_date_ref, time.min)
+    display_end = datetime.combine(end_date_ref, time.max)
 
-    chart_data = []
-    # Estrutura de métricas zerada para fallback
-    zero_metrics = {"views": 0, "likes": 0, "comments": 0, "net_growth": 0}
+    # Range de busca (inclui 1 dia antes para cálculo de delta)
+    query_start = display_start - timedelta(days=1)
+    
+    history = db.query(FollowerHistory).filter(
+        FollowerHistory.user_id == user.id,
+        FollowerHistory.date >= query_start,
+        FollowerHistory.date <= display_end
+    ).order_by(FollowerHistory.date).all()
+    
+    # Estrutura para processar os dados
+    processed_data = {}
+    
+    # Pré-carregar last_counts com o dia anterior ao display_start se existir
+    last_counts = {} 
 
-    for i in range(30):
-        day = end_date - timedelta(days=i)
-        day_str = day.strftime('%Y-%m-%d')
+    # 1. Agrupa
+    for record in history:
+        day_key = record.date.strftime("%d/%m")
+        # Se for o dia de buffer (antes do inicio da exibição), usamos só para setar o count inicial
+        if record.date < display_start:
+            last_counts[record.platform] = record.count
+            continue
+
+        if day_key not in processed_data:
+            processed_data[day_key] = {}
+        processed_data[day_key][record.platform] = record
+
+    # 2. Monta a lista final (apenas dias de exibição)
+    final_result = []
+    for i in range(31): # 31 dias para cobrir o range de exibição
+        target_date = display_start + timedelta(days=i)
+        if target_date > display_end: break
         
-        # Pega o dicionário de métricas completo do mapa, ou um fallback zerado
-        youtube_metrics = youtube_data_map.get(day_str, {})
+        day_key = target_date.strftime("%d/%m")
+        day_item = {"day": day_key}
         
-        chart_data.append({
-            "day": day.strftime('%d/%m'),
-            "youtube": {
-                "views": youtube_metrics.get("views", 0),
-                "likes": youtube_metrics.get("likes", 0),
-                "dislikes": youtube_metrics.get("dislikes", 0),
-                "comments": youtube_metrics.get("comments", 0),
-                "shares": youtube_metrics.get("shares", 0),
-                "net_growth": youtube_metrics.get("net_growth", 0),
-            },
-            # Mantém a estrutura para outras plataformas
-            "tiktok": zero_metrics,
-            "instagram": zero_metrics,
-        })
+        for plat in ['youtube', 'tiktok', 'instagram']:
+            record = processed_data.get(day_key, {}).get(plat)
+            
+            if record:
+                # Calcula o ganho real do dia (net_growth)
+                previous_count = last_counts.get(plat, 0)
+                # Se não tivermos previous_count (ex: primeiro dia do banco), net_growth pode ser o próprio count ou 0. 
+                # Assumimos 0 para evitar picos gigantes de "novos fãs" injustificados.
+                net_growth = (record.count - previous_count) if previous_count > 0 else 0
+                
+                # Atualiza o last_count para o próximo dia
+                if record.count > 0:
+                   last_counts[plat] = record.count
+
+                day_item[plat] = {
+                    "net_growth": net_growth,
+                    "views": record.views or 0,
+                    "likes": record.likes or 0,
+                    "comments": record.comments or 0,
+                    "shares": record.shares or 0,
+                    "profile_views": record.profile_views or 0
+                }
+            else:
+                # Preenche com zeros se não houver registro, mas mantém last_count
+                day_item[plat] = {"net_growth": 0, "views": 0, "likes": 0, "comments": 0, "shares": 0, "profile_views": 0}
         
-    return list(reversed(chart_data)) # Retorna em ordem cronológica
-
-def _generate_mock_daily_data(days: int):
-    """Helper para gerar dados diários mockados quando a API não está disponível."""
-    mock_data = []
-    zero_metrics = {"views": 0, "likes": 0, "dislikes": 0, "comments": 0, "shares": 0, "net_growth": 0}
-    for i in range(days):
-        day = datetime.now().date() - timedelta(days=i)
-        mock_data.append({
-            "day": day.strftime('%d/%m'),
-            "youtube": zero_metrics,
-            "tiktok": zero_metrics,
-            "instagram": zero_metrics,
-        })
-    return list(reversed(mock_data)) # Retorna em ordem cronológica
-
-
-import calendar
-
-# ... (rest of imports)
-
-# ... (rest of code)
-
-
-
-
-
-
+        final_result.append(day_item)
+        
+    print(f"--- [DEBUG DAILY] Gerando gráfico de {display_start.strftime('%d/%m')} até {display_end.strftime('%d/%m')}.")
+    return final_result
 
 @app.get("/dashboard/monthly_growth")
 def get_monthly_growth(
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    start_date: str,
+    end_date: str,
+    user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    from datetime import timedelta
-    from collections import defaultdict
-
-    user = db.query(User).filter(User.username == "testuser").first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuário de teste não encontrado.")
+    from .models import FollowerHistory
+    from datetime import datetime, date, timedelta
+    from calendar import monthrange
     
-    youtube_service = get_api_service("youtube", user.id)
-    if not youtube_service:
-        return _generate_mock_monthly_data(start_date=start_date, end_date=end_date)
-
-    # --- LÓGICA DO PLANO B ---
-    today = datetime.now().date()
-
-    # 1. Definir o período de 12 meses para trás a partir de uma data segura
-    safe_end_date = today - timedelta(days=3)
-    end_date = safe_end_date
-    start_date = (end_date.replace(day=1) - timedelta(days=365)).replace(day=1)
+    from sqlalchemy import func
     
-    # 2. Buscar dados DIÁRIOS para o período inteiro
-    youtube_daily_data = youtube_service.get_daily_subscriber_growth(db, start_date, end_date)
+    try:
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Data inválida")
 
-    # 3. Agrupar os dados diários em baldes mensais
-    monthly_aggregation = defaultdict(lambda: {
-        "views": 0, "likes": 0, "dislikes": 0, "comments": 0, "shares": 0, "net_growth": 0
-    })
+    result_data = []
+    current_dt = start_dt.replace(day=1)
+    end_iter_dt = end_dt.replace(day=1)
 
-    for daily_entry in youtube_daily_data:
-        # Extrai o mês no formato YYYY-MM da data 'YYYY-MM-DD'
-        month_key = daily_entry['date'][:7]
-        monthly_aggregation[month_key]['views'] += daily_entry.get('views', 0)
-        monthly_aggregation[month_key]['likes'] += daily_entry.get('likes', 0)
-        monthly_aggregation[month_key]['dislikes'] += daily_entry.get('dislikes', 0)
-        monthly_aggregation[month_key]['comments'] += daily_entry.get('comments', 0)
-        monthly_aggregation[month_key]['shares'] += daily_entry.get('shares', 0)
-        monthly_aggregation[month_key]['net_growth'] += daily_entry.get('net_growth', 0)
+    platforms = ['tiktok', 'youtube', 'instagram']
 
-    youtube_data_map = dict(monthly_aggregation)
-    # --- FIM DO PLANO B ---
+    while current_dt <= end_iter_dt:
+        _, last_day = monthrange(current_dt.year, current_dt.month)
+        month_start = datetime.combine(current_dt, datetime.min.time())
+        month_end = datetime.combine(current_dt.replace(day=last_day), datetime.max.time())
+        month_name = current_dt.strftime("%b/%y").capitalize()
 
-    month_map_display = {
-        '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr', '05': 'Mai', '06': 'Jun',
-        '07': 'Jul', '08': 'Ago', '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez'
-    }
+        month_item = {"name": month_name}
 
-    chart_data = []
-    current_month_iter = start_date
-    zero_metrics = {"views": 0, "likes": 0, "dislikes": 0, "comments": 0, "shares": 0, "net_growth": 0}
+        for plat in platforms:
+            # Para seguidores (net_growth), usamos a diferença entre o final e o início (Snapshot logic)
+            # Mas apenas se tivermos 'count' acumulativo. Se não, precisaríamos somar ganhos (se tivéssemos campo de ganho diário).
+            # Como FollowerHistory.count é TOTAL, mantemos a lógica de diferença para seguidores.
+            initial_record = db.query(FollowerHistory).filter(
+                FollowerHistory.user_id == user.id,
+                FollowerHistory.platform == plat,
+                FollowerHistory.date < month_start
+            ).order_by(FollowerHistory.date.desc()).first()
 
-    while current_month_iter <= end_date:
-        month_key_for_api_data = current_month_iter.strftime('%Y-%m')
-        month_display_name = month_map_display.get(current_month_iter.strftime('%m'), '??')
+            final_record = db.query(FollowerHistory).filter(
+                FollowerHistory.user_id == user.id,
+                FollowerHistory.platform == plat,
+                FollowerHistory.date <= month_end
+            ).order_by(FollowerHistory.date.desc()).first()
 
-        youtube_metrics = youtube_data_map.get(month_key_for_api_data, {})
+            # Calcular crescimento de seguidores
+            net_growth = 0
+            if final_record and initial_record:
+                net_growth = max(0, final_record.count - initial_record.count)
+            elif final_record:
+                # Se não tem registro anterior, assume que tudo é crescimento se for o primeiro mês? 
+                # Ou 0? Vamos assumir 0 para segurança ou pegar o próprio count se for início absoluto.
+                pass 
 
-        chart_data.append({
-            "name": month_display_name,
-            "youtube": {
-                "views": youtube_metrics.get("views", 0),
-                "likes": youtube_metrics.get("likes", 0),
-                "dislikes": youtube_metrics.get("dislikes", 0),
-                "comments": youtube_metrics.get("comments", 0),
-                "shares": youtube_metrics.get("shares", 0),
-                "net_growth": youtube_metrics.get("net_growth", 0),
-            },
-            "tiktok": zero_metrics,
-            "instagram": zero_metrics,
-        })
+            # Para Engajamento (Views, Likes, etc), SOMAMOS os registros diários do mês
+            stats_sum = db.query(
+                func.sum(FollowerHistory.views),
+                func.sum(FollowerHistory.likes),
+                func.sum(FollowerHistory.comments),
+                func.sum(FollowerHistory.shares),
+                func.sum(FollowerHistory.profile_views)
+            ).filter(
+                FollowerHistory.user_id == user.id,
+                FollowerHistory.platform == plat,
+                FollowerHistory.date >= month_start,
+                FollowerHistory.date <= month_end
+            ).first()
 
-        if current_month_iter.month == 12:
-            current_month_iter = current_month_iter.replace(year=current_month_iter.year + 1, month=1, day=1)
+            # Desempacotar e tratar None como 0
+            s_views, s_likes, s_comments, s_shares, s_profile = stats_sum
+            
+            month_item[plat] = {
+                "net_growth": net_growth,
+                "views": s_views or 0,
+                "likes": s_likes or 0,
+                "comments": s_comments or 0,
+                "shares": s_shares or 0,
+                "profile_views": s_profile or 0
+            }
+
+        result_data.append(month_item)
+        if current_dt.month == 12:
+            current_dt = current_dt.replace(year=current_dt.year + 1, month=1)
         else:
-            current_month_iter = current_month_iter.replace(month=current_month_iter.month + 1, day=1)
+            current_dt = current_dt.replace(month=current_dt.month + 1)
 
-    return chart_data
+    print(f"--- [DEBUG MONTHLY] Gerados {len(result_data)} meses de histórico ---")
+    return result_data
 
+# --- Rotas de Inteligência Artificial ---
 
+@app.get("/api/ai/status")
+def get_ai_status():
+    return gemini_service.get_quota_status()
 
+@app.post("/api/ai/general")
+async def generate_response(request: schemas.GenerateRequest, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    
+    history = []
+    existing_conv = None
 
+    # 1. Tenta recuperar histórico se conversation_id for fornecido
+    if request.conversation_id:
+        existing_conv = db.query(models.Conversation).filter(
+            models.Conversation.id == request.conversation_id,
+            models.Conversation.user_id == user.id
+        ).first()
+        if existing_conv:
+            history = existing_conv.messages or [] # Garante lista vazia se for None
 
+    # 2. Gera resposta com contexto
+    response_text = await gemini_service.generate_general_response(request.prompt, history=history)
+    
+    # 3. Salva ou Atualiza no Banco
+    try:
+        if existing_conv:
+            # Atualiza conversa existente
+            # Importante: Criar nova lista para forçar detecção de mudança pelo SQLAlchemy
+            new_messages = list(existing_conv.messages) if existing_conv.messages else []
+            new_messages.append({"role": "user", "content": request.prompt, "timestamp": datetime.now().isoformat()})
+            new_messages.append({"role": "assistant", "content": response_text, "timestamp": datetime.now().isoformat()})
+            
+            existing_conv.messages = new_messages
+            existing_conv.timestamp = datetime.now() # Atualiza last modified
+            db.commit()
+            db.refresh(existing_conv)
+            return {"response": response_text, "conversation_id": existing_conv.id}
+        else:
+            # Cria nova conversa
+            short_title = await gemini_service.generate_short_title(request.prompt)
+            
+            initial_messages = [
+                {"role": "user", "content": request.prompt, "timestamp": datetime.now().isoformat()},
+                {"role": "assistant", "content": response_text, "timestamp": datetime.now().isoformat()}
+            ]
+
+            new_conv = models.Conversation(
+                user_id=user.id,
+                title=short_title,
+                type="general",
+                prompt=request.prompt, # Mantém compatibilidade legado
+                response=response_text, # Mantém compatibilidade legado
+                messages=initial_messages
+            )
+            db.add(new_conv)
+            db.commit()
+            db.refresh(new_conv)
+            return {"response": response_text, "conversation_id": new_conv.id}
+
+    except Exception as e:
+        logger.error(f"Erro ao salvar histórico geral: {e}")
+        # Mesmo com erro de banco, retorna a resposta da IA
+        return {"response": response_text}
+
+@app.post("/api/ai/data_analytics")
+async def analyze_data(request: schemas.GenerateRequest, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    logger.info("--- [IA] Iniciando Análise Profunda do Histórico Completo ---")
+    
+    history = []
+    existing_conv = None
+
+    # 1. Recupera histórico se houver ID
+    if request.conversation_id:
+        existing_conv = db.query(models.Conversation).filter(
+            models.Conversation.id == request.conversation_id,
+            models.Conversation.user_id == user.id
+        ).first()
+        if existing_conv:
+            history = existing_conv.messages or []
+
+    # 2. Gera Análise
+    result = await data_analytics_service.analyze_data_with_context(request.prompt, db, history=history)
+    
+    # --- LIMPEZA AUTOMÁTICA DE VISUAL (REGEX) ---
+    import re
+    def clean_redundant_text(text):
+        if not isinstance(text, str): return text
+        text = re.sub(r'(?i)(?:tiktok|youtube|instagram)\s*(#\d+)', r'\1', text)
+        text = re.sub(r'(#\d+)\s+.*?(?=\n\n|#|$)', r'\1 ', text, flags=re.DOTALL)
+        return text.strip()
+
+    if isinstance(result, dict):
+        if 'insights_hierarchy' in result:
+            for key, val in result['insights_hierarchy'].items():
+                if isinstance(val, str):
+                    result['insights_hierarchy'][key] = clean_redundant_text(val)
+                elif isinstance(val, dict) and 'insight' in val:
+                    val['insight'] = clean_redundant_text(val['insight'])
+        
+        if 'diagnostic_cards' in result:
+            for card in result['diagnostic_cards']:
+                if 'content' in card:
+                    card['content'] = clean_redundant_text(card['content'])
+        
+        if 'executive_decisions' in result:
+            for dec in result['executive_decisions']:
+                if 'desc' in dec:
+                    dec['desc'] = clean_redundant_text(dec['desc'])
+
+    # 3. Salvar no Histórico (Memória)
+    try:
+        import json
+        
+        # Extrai o texto principal para exibir no chat simples se necessário
+        conversational_text = result.get('conversational_response') or result.get('insights_hierarchy', {}).get('master', "Relatório Gerado")
+        
+        if existing_conv:
+             # Atualiza conversa existente
+            new_messages = list(existing_conv.messages) if existing_conv.messages else []
+            new_messages.append({"role": "user", "content": request.prompt, "timestamp": datetime.now().isoformat()})
+            new_messages.append({
+                "role": "assistant", 
+                "content": conversational_text, 
+                "analytics_data": result, # Salva o JSON completo aqui
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            existing_conv.messages = new_messages
+            existing_conv.timestamp = datetime.now()
+            db.commit()
+            db.refresh(existing_conv)
+            
+            # Injeta o ID para retorno
+            result['conversation_id'] = existing_conv.id
+            
+        else:
+            # Nova conversa
+            short_title = await gemini_service.generate_short_title(request.prompt)
+            if not short_title or len(short_title.strip()) == 0:
+                short_title = "Relatório Estratégico"
+            
+            response_str = json.dumps(result)
+            conv_type = "report" if request.context_type == "report" else "analytics"
+            
+            initial_messages = [
+                {"role": "user", "content": request.prompt, "timestamp": datetime.now().isoformat()},
+                {"role": "assistant", "content": conversational_text, "analytics_data": result, "timestamp": datetime.now().isoformat()}
+            ]
+
+            new_conv = models.Conversation(
+                user_id=user.id,
+                title=short_title,
+                type=conv_type,
+                prompt=request.prompt,
+                response=response_str, # Legado
+                messages=initial_messages # Novo
+            )
+            db.add(new_conv)
+            db.commit()
+            db.refresh(new_conv)
+            
+            result['conversation_id'] = new_conv.id
+            logger.info(f"--- [DB] Nova conversa Analytics salva: {new_conv.id} ---")
+
+    except Exception as e:
+        logger.error(f"❌ ERRO CRÍTICO AO SALVAR HISTÓRICO ANALYTICS: {e}")
+
+    return result
+
+@app.get("/api/conversations", response_model=List[schemas.Conversation])
+def get_history(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    conversations = db.query(models.Conversation).filter(
+        models.Conversation.user_id == user.id,
+        models.Conversation.type.in_(['general', 'analytics'])
+    ).order_by(models.Conversation.timestamp.desc()).all()
+    return conversations
+
+@app.delete("/api/conversations/{conversation_id}")
+def delete_conversation(conversation_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    conv = db.query(models.Conversation).filter(
+        models.Conversation.id == conversation_id,
+        models.Conversation.user_id == user.id
+    ).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada")
+    db.delete(conv)
+    db.commit()
+    return {"status": "deleted"}
+
+@app.put("/api/conversations/{conversation_id}/rename")
+def rename_conversation(conversation_id: int, new_title: str = Body(..., embed=True), user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    conv = db.query(models.Conversation).filter(
+        models.Conversation.id == conversation_id,
+        models.Conversation.user_id == user.id
+    ).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada")
+    conv.title = new_title
+    db.commit()
+    return {"status": "renamed", "title": new_title}
+
+# --- Manual Metrics ---
+
+@app.get("/api/metrics/missing_days")
+def get_missing_metrics_days(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from .models import FollowerHistory
+    from datetime import datetime, timedelta, time, date
+    
+    today = datetime.now().date()
+    limit_date = date(2025, 12, 19)
+    result = []
+    
+    for i in range(1, 11):
+        check_date = today - timedelta(days=i)
+        if check_date < limit_date: continue
+            
+        start_of_day = datetime.combine(check_date, datetime.min.time())
+        end_of_day = datetime.combine(check_date, datetime.max.time())
+        
+        record = db.query(FollowerHistory).filter(
+            FollowerHistory.user_id == user.id,
+            FollowerHistory.platform == 'tiktok',
+            FollowerHistory.date >= start_of_day,
+            FollowerHistory.date <= end_of_day
+        ).first()
+        
+        reason = ""
+        if not record: reason = "Registro Ausente"
+        elif record.date.time() < time(23, 59, 0): reason = f"Pendente ({record.date.strftime('%H:%M')})"
+            
+        if reason:
+            result.append({
+                "date": check_date.strftime("%Y-%m-%d"),
+                "formatted_date": check_date.strftime("%d/%m/%Y"),
+                "reason": reason,
+                "current_count": record.count if record else 0,
+                "current_views": record.views if record else 0,
+                "current_likes": record.likes if record else 0
+            })
+    return result
+
+@app.post("/api/metrics/update_manual")
+def update_metrics_manually(updates: List[schemas.HistoryUpdate], user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from .models import FollowerHistory
+    from datetime import datetime, time
+    
+    for update in updates:
+        target_time = time(23, 59, 59) if update.is_final else time(12, 0, 0)
+        target_date = datetime.strptime(update.date, "%Y-%m-%d").date()
+        
+        record = db.query(FollowerHistory).filter(
+            FollowerHistory.user_id == user.id,
+            FollowerHistory.platform == update.platform,
+            FollowerHistory.date >= datetime.combine(target_date, datetime.min.time()),
+            FollowerHistory.date <= datetime.combine(target_date, datetime.max.time())
+        ).first()
+        
+        if record:
+            record.count = update.count
+            record.views = update.views or 0
+            record.likes = update.likes or 0
+            record.comments = update.comments or 0
+            record.shares = update.shares or 0
+            record.date = datetime.combine(target_date, target_time)
+            record.is_manual = True
+        else:
+            db.add(FollowerHistory(
+                user_id=user.id, platform=update.platform, count=update.count,
+                views=update.views or 0, likes=update.likes or 0, comments=update.comments or 0,
+                shares=update.shares or 0, date=datetime.combine(target_date, target_time),
+                is_manual=True
+            ))
+    db.commit()
+    return {"status": "success"}
+
+@app.post("/api/patterns/analyze")
+async def analyze_patterns(platform: str = "youtube", user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    query = db.query(models.Post).filter(
+        models.Post.user_id == user.id,
+        models.Post.is_pattern == True
+    )
+    
+    # Filtro de plataforma similar ao frontend
+    if platform == 'youtube':
+        query = query.filter(models.Post.platform.in_(['youtube', 'youtube_long']))
+    elif platform == 'shorts':
+        query = query.filter(models.Post.platform.like('%shorts%'))
+    elif platform == 'tiktok':
+        query = query.filter(models.Post.platform.like('%tiktok%'))
+    elif platform == 'instagram':
+        query = query.filter(models.Post.platform.like('%instagram%'))
+        
+    patterns = query.all()
+    
+    if not patterns:
+        return {"insight": "Nenhum padrão encontrado para esta plataforma. Marque alguns vídeos como referência primeiro."}
+        
+    # Prepara dados para a IA
+    patterns_data = []
+    for p in patterns:
+        patterns_data.append({
+            "title": p.title,
+            "tags": p.tags or "",
+            "description": p.description[:1500] if p.description else "", # Contexto AUMENTADO
+            "views": p.metrics.get('views', 0),
+            "likes": p.metrics.get('likes', 0),
+            "retention": p.metrics.get('averageViewPercentage', 0)
+        })
+        
+    # Chama o serviço de IA
+    insight = await gemini_service.generate_pattern_analysis(patterns_data, platform)
+    
+    return {"insight": insight}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    import uvicorn
+    uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=True)

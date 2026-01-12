@@ -90,7 +90,7 @@ function createWindow() {
 
 app.on('ready', () => {
   console.log('--- [ELECTRON] Evento READY disparado');
-  createApiProcess();
+  // createApiProcess(); // Desabilitado para permitir inicialização manual do backend
   createWindow();
 });
 

@@ -17,6 +17,8 @@
 # Environment Variables
 .env
 .env*.local
-backend/.env
+
 frontend/.env
 backend/client_secret.json
+
+

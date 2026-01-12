@@ -1,6 +1,6 @@
-from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List
 from datetime import datetime, date, timedelta
+import re
 
 # Google API specific imports
 from google_auth_oauthlib.flow import Flow
@@ -13,49 +13,19 @@ import certifi
 
 # Local imports
 from .config import get_settings
-from .models import Credential # Import Credential from models.py
+from .models import Credential, Post # Import Credential from models.py
 from sqlalchemy.orm import Session # Import Session directly
+from .tiktok_service import TiktokApiService # Importa o novo serviço
+from .base_service import ApiService
 
 settings = get_settings()
 
-class ApiService(ABC):
-    """
-    Classe base abstrata para serviços de API de mídia social.
-    Define a interface comum para autenticação e recuperação de dados.
-    """
-    PLATFORM: str = ""
-    SCOPES: List[str] = []
+settings = get_settings()
 
-    def __init__(self, user_id: int):
-        self.user_id = user_id
+import base64
+import json
 
-    @abstractmethod
-    def get_authorization_url(self) -> str:
-        """Retorna a URL para iniciar o fluxo OAuth 2.0."""
-        pass
-
-    @abstractmethod
-    def fetch_and_store_token(self, auth_response_url: str, db: Session) -> Dict[str, Any]:
-        """
-        Completa o fluxo OAuth 2.0, busca o token e o armazena no banco de dados.
-        Retorna os detalhes da credencial.
-        """
-        pass
-
-    @abstractmethod
-    def refresh_access_token(self, db: Session, credential: Credential) -> Credential:
-        """
-        Usa o refresh_token para obter um novo access_token se o atual estiver expirado.
-        Atualiza e retorna a credencial.
-        """
-        pass
-    
-    @abstractmethod
-    def get_audience_data(self, db: Session) -> Dict[str, Any]:
-        """
-        Recupera dados de audiência (ex: inscritos) usando a credencial armazenada.
-        """
-        pass
+# ... (other imports)
 
 class YoutubeApiService(ApiService):
     PLATFORM = "youtube"
@@ -117,30 +87,35 @@ class YoutubeApiService(ApiService):
             print(f"Erro ao buscar estatísticas públicas do vídeo: {e}")
             return {}
 
-    def get_authorization_url(self, user_id: int) -> str:
+    def get_authorization_url(self, user_id: int, callback_url: Optional[str] = None) -> str:
         """
         Retorna a URL de autorização do YouTube.
-        O user_id é codificado no 'state' para ser recuperado no callback.
+        O user_id e o callback_url opcional são codificados no 'state'.
         """
         flow = self._get_flow()
-        # Incluímos o user_id no 'state' para identificá-lo após o redirecionamento
+        
+        state_data = {'user_id': str(user_id)}
+        if callback_url:
+            state_data['callback_url'] = callback_url
+        
+        encoded_state = base64.urlsafe_b64encode(json.dumps(state_data).encode()).decode()
+
         authorization_url, state = flow.authorization_url(
-            access_type='offline', # Necessário para obter um refresh_token
+            access_type='offline',
             include_granted_scopes='true',
-            state=str(user_id) # Usamos o user_id como state
+            state=encoded_state
         )
         return authorization_url
 
-    def fetch_and_store_token(self, auth_response_url: str, db: Session, user_id: int) -> Credential:
+    def fetch_and_store_token(self, auth_response_url: str, db: Session, user_id: int, state: str) -> Credential:
         """
         Completa o fluxo OAuth, busca o token e o armazena para o usuário.
         """
-        flow = self._get_flow(state=str(user_id)) # Passa o state para o flow para que ele possa processar
+        flow = self._get_flow(state=state)
         flow.fetch_token(authorization_response=auth_response_url)
 
         credentials = flow.credentials
-        # user_id já é passado, não precisa extrair de flow.state
-
+        
         # Armazenar credenciais no banco de dados
         credential_data = {
             "token": credentials.token,
@@ -177,7 +152,7 @@ class YoutubeApiService(ApiService):
         db.commit()
         db.refresh(db_credential)
         return db_credential
-
+    
     def refresh_access_token(self, db: Session, credential: Credential) -> Credential:
         """
         Usa o refresh_token para obter um novo access_token se o atual estiver expirado.
@@ -185,7 +160,7 @@ class YoutubeApiService(ApiService):
         creds = Credentials(
             token=credential.access_token,
             refresh_token=credential.refresh_token,
-            token_uri=settings.YOUTUBE_REDIRECT_URI,
+            token_uri="https://oauth2.googleapis.com/token",  # CORREÇÃO
             client_id=settings.YOUTUBE_CLIENT_ID,
             client_secret=settings.YOUTUBE_CLIENT_SECRET,
             scopes=credential.scope.split() if credential.scope else [],
@@ -227,7 +202,7 @@ class YoutubeApiService(ApiService):
         creds = Credentials(
             token=db_credential.access_token,
             refresh_token=db_credential.refresh_token,
-            token_uri=settings.YOUTUBE_REDIRECT_URI,
+            token_uri="https://oauth2.googleapis.com/token",  # CORREÇÃO
             client_id=settings.YOUTUBE_CLIENT_ID,
             client_secret=settings.YOUTUBE_CLIENT_SECRET,
             scopes=db_credential.scope.split() if db_credential.scope else [],
@@ -259,7 +234,7 @@ class YoutubeApiService(ApiService):
         creds = Credentials(
             token=db_credential.access_token,
             refresh_token=db_credential.refresh_token,
-            token_uri=settings.YOUTUBE_REDIRECT_URI,
+            token_uri="https://oauth2.googleapis.com/token",  # CORREÇÃO
             client_id=settings.YOUTUBE_CLIENT_ID,
             client_secret=settings.YOUTUBE_CLIENT_SECRET,
             scopes=db_credential.scope.split() if db_credential.scope else [],
@@ -352,11 +327,16 @@ class YoutubeApiService(ApiService):
 
         except Exception as e:
             print(f"Erro ao buscar dados de audiência do YouTube: {e}")
-            return {"error": str(e)}
+            # Retorna uma estrutura de dados padrão em caso de erro, para evitar que o frontend quebre
+            return {
+                "youtube_long": {"count": 0, "growth": "0.00%"},
+                "youtube_shorts": {"count": 0, "growth": "0.00%"}
+            }
 
     def get_daily_subscriber_growth(self, db: Session, start_date: date, end_date: date) -> List[Dict[str, Any]]:
         """
         Recupera as métricas diárias de crescimento do canal usando a API do YouTube Analytics.
+        Agora inclui TEMPO ASSISTIDO e DURAÇÃO MÉDIA.
         """
         analytics_service = self._get_authenticated_analytics_service(db)
         channel_id = self._get_channel_id(db)
@@ -368,14 +348,16 @@ class YoutubeApiService(ApiService):
                 ids=f'channel=={channel_id}',
                 startDate=start_date.isoformat(),
                 endDate=end_date.isoformat(),
-                metrics='views,likes,dislikes,comments,shares,subscribersGained,subscribersLost',
+                metrics='views,likes,dislikes,comments,shares,subscribersGained,subscribersLost,videosAddedToPlaylists,estimatedMinutesWatched,averageViewDuration',
                 dimensions='day'
             ).execute()
 
             daily_data = []
             if 'rows' in report:
                 for row in report['rows']:
-                    day_str, views, likes, dislikes, comments, shares, gained, lost = row
+                    # Mapeamento expandido
+                    day_str, views, likes, dislikes, comments, shares, gained, lost, playlist_adds, minutes_watched, avg_duration = row
+                    
                     net_growth = gained - lost
                     daily_data.append({
                         "date": day_str,
@@ -384,9 +366,12 @@ class YoutubeApiService(ApiService):
                         "dislikes": dislikes,
                         "comments": comments,
                         "shares": shares,
+                        "saves": playlist_adds,
                         "gained": gained,
                         "lost": lost,
-                        "net_growth": net_growth
+                        "net_growth": net_growth,
+                        "minutes_watched": minutes_watched,
+                        "avg_view_duration": avg_duration # Segundos
                     })
             return daily_data
         except Exception as e:
@@ -407,14 +392,14 @@ class YoutubeApiService(ApiService):
                 ids=f'channel=={channel_id}',
                 startDate=start_date.isoformat(),
                 endDate=end_date.isoformat(),
-                metrics='views,likes,dislikes,comments,shares,subscribersGained,subscribersLost',
+                metrics='views,likes,dislikes,comments,shares,subscribersGained,subscribersLost,videosAddedToPlaylists,estimatedMinutesWatched,averageViewDuration',
                 dimensions='month'
             ).execute()
 
             monthly_data = []
             if 'rows' in report:
                 for row in report['rows']:
-                    month_str, views, likes, dislikes, comments, shares, gained, lost = row
+                    month_str, views, likes, dislikes, comments, shares, gained, lost, playlist_adds, minutes_watched, avg_duration = row
                     net_growth = gained - lost
                     monthly_data.append({
                         "month": month_str,
@@ -423,18 +408,236 @@ class YoutubeApiService(ApiService):
                         "dislikes": dislikes,
                         "comments": comments,
                         "shares": shares,
+                        "saves": playlist_adds,
                         "gained": gained,
                         "lost": lost,
-                        "net_growth": net_growth
+                        "net_growth": net_growth,
+                        "minutes_watched": minutes_watched,
+                        "avg_view_duration": avg_duration
                     })
             return monthly_data
         except Exception as e:
             print(f"Erro ao buscar crescimento mensal de inscritos do YouTube: {e}")
             return []
 
+    def get_video_analytics(self, db: Session, video_id: str) -> Dict[str, Any]:
+        """
+        Busca um relatório de métricas detalhadas para um vídeo específico.
+        """
+        analytics_service = self._get_authenticated_analytics_service(db)
+        if not analytics_service:
+            return {"error": "Serviço de análise não autenticado."}
+
+        # Busca a data de publicação do vídeo para usar como data de início
+        post = db.query(Post).filter(Post.platform_content_id == video_id).first()
+        if not post or not post.published_at:
+            start_date = (date.today() - timedelta(days=365*5)).isoformat() # Usa uma data antiga como padrão
+        else:
+            start_date = post.published_at.date().isoformat()
+
+        end_date = date.today().isoformat()
+        
+        try:
+            report = analytics_service.reports().query(
+                ids=f'channel=={self._get_channel_id(db)}',
+                startDate=start_date,
+                endDate=end_date,
+                metrics='views,likes,dislikes,comments,shares,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,subscribersGained,subscribersLost',
+                filters=f"video=={video_id}"
+            ).execute()
+
+            if 'rows' in report and report['rows']:
+                # As métricas de vídeo único vêm em uma única linha
+                data_row = report['rows'][0]
+                headers = [header['name'] for header in report['columnHeaders']]
+                return dict(zip(headers, data_row))
+            else:
+                return {"message": "Nenhum dado de análise encontrado para este vídeo no período."}
+
+        except Exception as e:
+            print(f"Erro ao buscar análise do vídeo '{video_id}': {e}")
+            return {"error": str(e)}
+
+    def synchronize_posts(self, db: Session):
+        """
+        Busca todos os vídeos do canal do usuário, os classifica como 'long' ou 'shorts'
+        baseado na duração, e os salva/atualiza no banco de dados.
+        """
+        import re
+        from datetime import timedelta
+
+        def parse_iso8601_duration(duration_str: str) -> timedelta:
+            """Analisa uma string de duração ISO 8601 (ex: PT1M5S) para um objeto timedelta."""
+            match = re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', duration_str or '')
+            if not match:
+                return timedelta()
+            hours, minutes, seconds = match.groups()
+            return timedelta(
+                hours=int(hours) if hours else 0,
+                minutes=int(minutes) if minutes else 0,
+                seconds=int(seconds) if seconds else 0
+            )
+
+        youtube_data_service = self._get_authenticated_data_service(db)
+        if not youtube_data_service:
+            return {"error": "Falha na autenticação com o YouTube."}
+
+        try:
+            channels_response = youtube_data_service.channels().list(mine=True, part='contentDetails').execute()
+            if not channels_response.get('items'):
+                return {"error": "Nenhum canal do YouTube encontrado."}
+            uploads_playlist_id = channels_response['items'][0]['contentDetails']['relatedPlaylists']['uploads']
+            print(f"DEBUG: ID da playlist de uploads obtido: {uploads_playlist_id}")
+        except Exception as e:
+            print(f"DEBUG: Erro ao buscar o canal do YouTube: {e}")
+            return {"error": str(e)}
+
+        all_video_ids = []
+        next_page_token = None
+        while True:
+            try:
+                playlist_response = youtube_data_service.playlistItems().list(
+                    playlistId=uploads_playlist_id,
+                    part='contentDetails',
+                    maxResults=50,
+                    pageToken=next_page_token
+                ).execute()
+                new_video_ids = [item['contentDetails']['videoId'] for item in playlist_response.get('items', [])]
+                all_video_ids.extend(new_video_ids)
+                next_page_token = playlist_response.get('nextPageToken')
+                if not next_page_token:
+                    break
+            except Exception as e:
+                return {"error": str(e)}
+        
+        updated_count = 0
+        created_count = 0
+        for i in range(0, len(all_video_ids), 50):
+            batch_ids = all_video_ids[i:i+50]
+            try:
+                # Busca de detalhes, estatísticas, e player (para dimensões)
+                videos_response = youtube_data_service.videos().list(
+                    part="snippet,contentDetails,statistics,player",
+                    id=",".join(batch_ids)
+                ).execute()
+                
+                # Busca de inscritos ganhos (Analytics API)
+                analytics_service = self._get_authenticated_analytics_service(db)
+                subscribers_gained_map = {}
+                if analytics_service:
+                    try:
+                        start_date_analytics = '2005-02-14'
+                        end_date_analytics = datetime.now().strftime('%Y-%m-%d')
+                        
+                        analytics_response = analytics_service.reports().query(
+                            ids=f'channel=={channels_response["items"][0]["id"]}',
+                            startDate=start_date_analytics,
+                            endDate=end_date_analytics,
+                            metrics='subscribersGained',
+                            dimensions='video',
+                            filters=f"video=={','.join(batch_ids)}"
+                        ).execute()
+
+                        if 'rows' in analytics_response:
+                            for row in analytics_response['rows']:
+                                video_id_from_analytics, subscribers_gained = row
+                                subscribers_gained_map[video_id_from_analytics] = subscribers_gained
+                    except Exception as e:
+                        print(f"Alerta: Não foi possível buscar 'subscribersGained' do Analytics API para o lote: {e}")
+
+                for video_item in videos_response.get('items', []):
+                    video_id = video_item['id']
+                    
+                    # --- NOVA LÓGICA DE CLASSIFICAÇÃO (SOMENTE PELA DURAÇÃO) ---
+                    platform_type = "youtube_long" # Padrão
+                    duration_iso = video_item.get('contentDetails', {}).get('duration')
+                    duration_seconds = parse_iso8601_duration(duration_iso).total_seconds()
+
+                    # Se a duração for maior que 3 minutos (180 segundos), é longo.
+                    # Caso contrário (3 minutos ou menos), é um Short.
+                    if duration_seconds > 180:
+                        platform_type = "youtube_long"
+                    else:
+                        platform_type = "youtube_shorts"
+                    # --- FIM DA NOVA LÓGICA ---
+
+                    stats = video_item.get('statistics', {})
+                    metrics = {
+                        "views": int(stats.get('viewCount', 0)),
+                        "likes": int(stats.get('likeCount', 0)),
+                        "comments": int(stats.get('commentCount', 0)),
+                        "subscribers_gained": int(subscribers_gained_map.get(video_id, 0)),
+                        "last_updated": datetime.now().isoformat()
+                    }
+
+                    existing_post = db.query(Post).filter_by(user_id=self.user_id, platform_content_id=video_id).first()
+
+                    # Lógica robusta para extração de Thumbnail (MaxRes -> Standard -> High -> Medium -> Default)
+                    thumbs = video_item['snippet'].get('thumbnails', {})
+                    thumb_url = (
+                        thumbs.get('maxres', {}).get('url') or 
+                        thumbs.get('standard', {}).get('url') or 
+                        thumbs.get('high', {}).get('url') or 
+                        thumbs.get('medium', {}).get('url') or 
+                        thumbs.get('default', {}).get('url')
+                    )
+
+                    if existing_post:
+                        existing_post.metrics = metrics
+                        existing_post.last_synced_at = datetime.now()
+                        existing_post.platform = platform_type
+                        existing_post.thumbnail_url = thumb_url # Força atualização da thumbnail
+                        existing_post.title = video_item['snippet']['title'] # Força atualização do título
+                        updated_count += 1
+                        try:
+                            db.commit()
+                        except Exception as e:
+                            db.rollback()
+                            print(f"Erro ao comitar atualização do post {video_id}: {e}")
+                    else:
+                        new_post = Post(
+                            user_id=self.user_id,
+                            platform=platform_type,
+                            platform_id=video_item['snippet']['channelId'],
+                            platform_content_id=video_id,
+                            title=video_item['snippet']['title'],
+                            description=video_item['snippet']['description'],
+                            published_at=datetime.strptime(video_item['snippet']['publishedAt'], '%Y-%m-%dT%H:%M:%SZ'),
+                            thumbnail_url=thumb_url,
+                            metrics=metrics,
+                            last_synced_at=datetime.now()
+                        )
+                        db.add(new_post)
+                        created_count += 1
+                        try:
+                            db.commit()
+                        except Exception as e:
+                            db.rollback()
+                            # Se falhou ao inserir, provavelmente já existe (concorrência). Tenta atualizar.
+                            print(f"Erro de concorrência ao inserir post {video_id} (tentando recuperar e atualizar): {e}")
+                            try:
+                                retry_post = db.query(Post).filter_by(user_id=self.user_id, platform_content_id=video_id).first()
+                                if retry_post:
+                                    retry_post.metrics = metrics
+                                    retry_post.last_synced_at = datetime.now()
+                                    db.commit()
+                                    updated_count += 1
+                                    created_count -= 1 # Corrige a contagem pois foi update, não create
+                            except Exception as retry_error:
+                                print(f"Falha definitiva ao salvar post {video_id}: {retry_error}")
+
+            except Exception as e:
+                print(f"Erro ao processar lote de vídeos {batch_ids}: {e}")
+
+        return {"status": "success", "processed_videos": updated_count + created_count, "new_videos": created_count, "updated_videos": updated_count}
+
+
+
+
 # Mapeamento de serviços de API por plataforma
 API_SERVICES: Dict[str, type[ApiService]] = {
-    "youtube": YoutubeApiService
+    "youtube": YoutubeApiService,
+    "tiktok": TiktokApiService
 }
 
 # Helper para obter a instância do serviço
