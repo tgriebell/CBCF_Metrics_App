@@ -1,11 +1,15 @@
 {
   "name": "cbcf-metrics-app",
   "version": "1.0.0",
-  "description": "Painel de Métricas e Metas CBCF",
+  "description": "Painel de Mï¿½tricas e Metas CBCF",
   "main": "electron/main.js",
   "author": "Thiago Griebel",
   "license": "MIT",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tgriebell/CBCF_Metrics_App.git"
+  },
   "scripts": {
     "dev": "concurrently -k \"npm run dev:frontend\" \"npm run dev:electron\"",
     "dev:frontend": "cd frontend && npm run dev",
@@ -14,6 +18,11 @@
     "dist": "npm run build:frontend && electron-builder"
   },
   "build": {
+    "publish": {
+      "provider": "github",
+      "owner": "tgriebell",
+      "repo": "CBCF_Metrics_App"
+    },
     "appId": "com.cbcf.metrics",
     "productName": "CBCF Metrics",
     "directories": {
@@ -40,5 +49,8 @@
     "electron": "^28.0.0",
     "electron-builder": "^24.9.1",
     "wait-on": "^7.2.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.7.3"
   }
 }
