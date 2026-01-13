@@ -34,6 +34,11 @@ if (!gotTheLock) {
   } else {
     app.setAsDefaultProtocolClient(PROTOCOL);
   }
+
+  app.on('ready', () => {
+    createApiProcess(); // Inicia o Backend Python
+    createWindow();
+  });
 }
 
 console.log('--- [ELECTRON] Iniciando script main.js ---');
