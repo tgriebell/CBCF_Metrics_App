@@ -1,11 +1,39 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+// const { autoUpdater } = require('electron-updater'); // Descomentar quando instalar
 
 console.log('--- [ELECTRON] Iniciando script main.js ---');
 
 let mainWindow;
 let apiProcess;
+
+// --- SIMULAÇÃO DE UPDATE (PARA DEV) ---
+function simulateUpdateCycle(win) {
+  if (!win) return;
+  console.log('[DEV] Iniciando simulação de update...');
+
+  // 1. Verificando...
+  setTimeout(() => win.webContents.send('update-status', { status: 'checking', msg: 'Verificando atualizações...' }), 2000);
+
+  // 2. Encontrado!
+  setTimeout(() => win.webContents.send('update-status', { status: 'available', msg: 'Nova versão de inteligência encontrada (v2.0).' }), 4000);
+
+  // 3. Baixando...
+  let progress = 0;
+  const interval = setInterval(() => {
+    progress += Math.random() * 15;
+    if (progress >= 100) {
+      progress = 100;
+      clearInterval(interval);
+      // 4. Concluído
+      win.webContents.send('update-status', { status: 'downloaded', msg: 'Atualização pronta. Reiniciando...' });
+      win.webContents.send('download-progress', 100);
+    } else {
+      win.webContents.send('download-progress', Math.round(progress));
+    }
+  }, 800);
+}
 
 // Configuração do Python
 const PY_DIST_FOLDER = 'backend-dist';
@@ -22,29 +50,11 @@ const getScriptPath = () => {
 const createApiProcess = () => {
   const script = getScriptPath();
   console.log(`--- [ELECTRON] Tentando iniciar Python em: ${script}`);
-
   try {
     if (app.isPackaged) {
       apiProcess = spawn(script);
     } else {
-      // Tenta 'python' primeiro, se falhar o usuário pode precisar de 'python3'
       apiProcess = spawn('python', [script]);
-    }
-
-    if (apiProcess) {
-      console.log('--- [ELECTRON] Processo Python criado com PID:', apiProcess.pid);
-      
-      apiProcess.stdout.on('data', (data) => {
-        console.log(`[PYTHON LOG]: ${data}`);
-      });
-      
-      apiProcess.stderr.on('data', (data) => {
-        console.error(`[PYTHON ERRO]: ${data}`);
-      });
-
-      apiProcess.on('error', (err) => {
-        console.error('--- [ELECTRON] Falha ao iniciar Python:', err);
-      });
     }
   } catch (e) {
     console.error('--- [ELECTRON] Erro fatal ao spawnar Python:', e);
@@ -54,33 +64,39 @@ const createApiProcess = () => {
 function createWindow() {
   console.log('--- [ELECTRON] Criando Janela...');
   
-  // Caminho do ícone
   const iconPath = path.join(__dirname, '../frontend/public/img/splash.png');
-  console.log('--- [ELECTRON] Ícone procurado em:', iconPath);
 
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     backgroundColor: '#020715',
-    title: 'CBCF Metrics - Debug Mode',
-    icon: iconPath, // Se não achar o ícone, ele usa o padrão sem travar
+    title: 'CBCF Metrics - Pro System',
+    icon: iconPath,
+    show: false, // Só mostra quando estiver pronta
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      nodeIntegration: false, // Segurança: ON
+      contextIsolation: true, // Segurança: ON
+      preload: path.join(__dirname, 'preload.js') // Ponte: ON
     },
   });
 
   // Carregamento
   if (!app.isPackaged) {
     console.log('--- [ELECTRON] Carregando URL de Desenvolvimento (Vite)...');
-    // Pequeno delay para garantir que o Vite subiu
     setTimeout(() => {
         mainWindow.loadURL('http://localhost:5173')
-          .then(() => console.log('--- [ELECTRON] URL carregada com sucesso!'))
+          .then(() => {
+             console.log('--- [ELECTRON] URL carregada com sucesso!');
+             mainWindow.show();
+             // INICIA SIMULAÇÃO SE ESTIVER EM DEV
+             simulateUpdateCycle(mainWindow); 
+          })
           .catch(e => console.error('--- [ELECTRON] Erro ao carregar URL:', e));
     }, 2000);
   } else {
     mainWindow.loadFile(path.join(__dirname, '../frontend/dist/index.html'));
+    mainWindow.show();
+    // autoUpdater.checkForUpdatesAndNotify(); // Descomentar em PROD
   }
 
   mainWindow.on('closed', () => {
@@ -88,20 +104,20 @@ function createWindow() {
   });
 }
 
+// --- IPC HANDLERS ---
+ipcMain.on('restart-app', () => {
+  // autoUpdater.quitAndInstall();
+  console.log('[DEV] Restart solicitado pelo Frontend (Simulado)');
+  app.relaunch();
+  app.exit();
+});
+
 app.on('ready', () => {
-  console.log('--- [ELECTRON] Evento READY disparado');
-  // createApiProcess(); // Desabilitado para permitir inicialização manual do backend
   createWindow();
 });
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
-  }
-});
-
-app.on('will-quit', () => {
-  if (apiProcess) {
-    apiProcess.kill();
   }
 });

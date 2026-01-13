@@ -335,9 +335,13 @@ async def sync_platform(platform: str, user: models.User = Depends(get_current_u
 def get_dashboard_summary(db: Session = Depends(get_db)):
     from datetime import datetime
     
+    from datetime import timedelta
+    
     today = datetime.now().date()
     start_of_day = datetime.combine(today, datetime.min.time())
-    end_of_day = datetime.combine(today, datetime.max.time())
+    # AJUSTE DE FUSO: Estende a busca até as 04:00 do dia seguinte.
+    # Isso captura vídeos postados à noite no Brasil (que viram madrugada UTC no banco).
+    end_of_day = datetime.combine(today, datetime.max.time()) + timedelta(hours=4)
 
     # Função auxiliar para contar posts do dia por plataforma
     def count_today(platform_key):

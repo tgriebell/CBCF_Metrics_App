@@ -386,20 +386,69 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-// Splash Screen
+// Splash Screen (Inteligente com Atualização OTA)
 const SplashScreen = ({ onComplete }) => {
   const [progress, setProgress] = useState(0);
+  const [statusText, setStatusText] = useState("Inicializando Sistema");
+  const [isUpdating, setIsUpdating] = useState(false);
+
   useEffect(() => {
-    let current = 0;
-    const interval = setInterval(() => {
-      const increment = Math.max(1, (100 - current) / 10); 
-      current += increment;
-      if (current >= 99) { current = 100; clearInterval(interval); }
-      setProgress(current);
-    }, 50);
-    const timer = setTimeout(onComplete, 3500);
-    return () => { clearTimeout(timer); clearInterval(interval); };
-  }, [onComplete]);
+    // Verifica se estamos no Electron (via Preload)
+    if (window.electron) {
+      console.log("--- [SPLASH] Modo Electron Detectado ---");
+      
+      // 1. Escuta Status
+      window.electron.onUpdateStatus(({ status, msg }) => {
+        console.log(`[UPDATE] Status: ${status} - ${msg}`);
+        setStatusText(msg);
+        
+        if (status === 'checking') {
+             setProgress(10); // Feedback visual inicial
+        }
+        if (status === 'available') {
+             setIsUpdating(true); // Bloqueia a entrada, vai atualizar
+        }
+        if (status === 'downloaded') {
+             setProgress(100);
+             setStatusText("Reiniciando para aplicar...");
+             setTimeout(() => window.electron.restartApp(), 2000);
+        }
+      });
+
+      // 2. Escuta Progresso do Download
+      window.electron.onDownloadProgress((prog) => {
+        setProgress(prog);
+        if (prog < 100) {
+            setStatusText(`Baixando Atualização: ${Math.round(prog)}%`);
+        }
+      });
+
+      // 3. Fallback de Segurança (Caso não haja update, entra no app)
+      // Se em 8 segundos nada acontecer (sem update available), entra.
+      const safetyTimer = setTimeout(() => {
+        if (!isUpdating && progress < 100) {
+            // Simula finalização rápida
+            setStatusText("Carregando Módulos...");
+            setProgress(100);
+            setTimeout(onComplete, 500);
+        }
+      }, 8000);
+
+      return () => clearTimeout(safetyTimer);
+
+    } else {
+      // --- MODO NAVEGADOR (Fallback Visual) ---
+      let current = 0;
+      const interval = setInterval(() => {
+        const increment = Math.max(1, (100 - current) / 10); 
+        current += increment;
+        if (current >= 99) { current = 100; clearInterval(interval); }
+        setProgress(current);
+      }, 50);
+      const timer = setTimeout(onComplete, 3500);
+      return () => { clearTimeout(timer); clearInterval(interval); };
+    }
+  }, [onComplete, isUpdating]); // isUpdating adicionado para evitar race condition
 
   return (
     <main className="fixed inset-0 z-[9999] flex flex-col items-center justify-center splash-bg">
@@ -407,10 +456,10 @@ const SplashScreen = ({ onComplete }) => {
         <div className="splash-logo-frame">
           <img src="/img/splash.png" alt="CBCF" className="w-[320px] h-auto object-contain mb-4 drop-shadow-[0_0_15px_rgba(59,245,165,0.15)]" />
           <div className="splash-loader-bar">
-            <div className="bar-inner" style={{ width: `${progress}%` }}></div>
+            <div className="bar-inner" style={{ width: `${progress}%`, transition: isUpdating ? 'width 0.2s linear' : 'width 0.2s ease-out' }}></div>
           </div>
           <div className="mt-4 w-full flex justify-between text-[10px] font-bold tracking-[0.2em] text-[#3bf5a5] opacity-80 uppercase">
-             <span>Inicializando</span>
+             <span>{statusText}</span>
              <span>{Math.round(progress)}%</span>
           </div>
         </div>
@@ -1029,11 +1078,17 @@ const DashboardView = ({
             <div className="space-y-2">
               {(() => {
                 const today = new Date();
+                const startOfDay = new Date(today);
+                startOfDay.setHours(0, 0, 0, 0);
+                
+                // Estende a janela até as 04:00 do dia seguinte para pegar posts da "madrugada UTC"
+                const endOfWindow = new Date(today);
+                endOfWindow.setDate(endOfWindow.getDate() + 1);
+                endOfWindow.setHours(4, 0, 0, 0);
+
                 const todaysPosts = posts.filter(post => {
                   const postDate = new Date(post.published_at);
-                  return postDate.getDate() === today.getDate() &&
-                        postDate.getMonth() === today.getMonth() &&
-                        postDate.getFullYear() === today.getFullYear();
+                  return postDate >= startOfDay && postDate <= endOfWindow;
                 });
 
                 if (todaysPosts.length === 0) {

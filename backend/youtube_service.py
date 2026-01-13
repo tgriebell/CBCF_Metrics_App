@@ -347,10 +347,13 @@ class YoutubeApiService(ApiService):
                     part='snippet,statistics,contentDetails'
                 ).execute()
                 
+                # Otimização: Busca posts existentes deste lote para atualizar
+                existing_posts = db.query(Post).filter(Post.platform_content_id.in_(vid_ids)).all()
+                
                 for item in vid_details['items']:
                     # Extrair duração
                     duration_iso = item.get('contentDetails', {}).get('duration')
-                    duration_seconds = self.parse_iso8601_duration(duration_iso).total_seconds()
+                    duration_seconds = parse_iso8601_duration(duration_iso).total_seconds()
 
                     # Definir tipo de plataforma
                     platform_type = 'youtube_shorts' if duration_seconds <= 180 else 'youtube_long'
@@ -362,7 +365,7 @@ class YoutubeApiService(ApiService):
                         "duration": int(duration_seconds) # SALVANDO AQUI
                     }
                     
-                    existing = next((p for p in posts_to_update if p.platform_content_id == item['id']), None)
+                    existing = next((p for p in existing_posts if p.platform_content_id == item['id']), None)
                     thumb_url = item['snippet'].get('thumbnails', {}).get('high', {}).get('url') or item['snippet'].get('thumbnails', {}).get('default', {}).get('url')
                     
                     if existing:
