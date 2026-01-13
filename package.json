@@ -37,6 +37,14 @@
       "target": "nsis",
       "icon": "frontend/public/img/splash.png"
     },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "CBCF Metrics"
+    },
     "extraResources": [
       {
         "from": "backend-dist",

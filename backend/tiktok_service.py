@@ -85,7 +85,8 @@ class TiktokApiService(ApiService):
         save_session(session_id, {
             "code_verifier": code_verifier,
             "expected_challenge": code_challenge,
-            "user_id": user_id
+            "user_id": user_id,
+            "callback_url": callback_url
         })
 
         state_data = { "session_id": session_id }
@@ -229,8 +230,7 @@ class TiktokApiService(ApiService):
             
             db.commit()
             print("DEBUG: Credenciais salvas no banco com sucesso!")
-            return db_credential 
-
+            return db_credential, session_data.get("callback_url")
         except Exception as e:
             print(f"Erro no fluxo TikTok: {e}")
             raise e

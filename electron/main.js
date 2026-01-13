@@ -1,12 +1,42 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 // const { autoUpdater } = require('electron-updater'); // Descomentar quando instalar
 
-console.log('--- [ELECTRON] Iniciando script main.js ---');
-
+const PROTOCOL = 'cbcfmetrics';
 let mainWindow;
 let apiProcess;
+
+// Configuração de Single Instance Lock
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+      
+      // Captura a URL do Deep Link (Windows)
+      const url = commandLine.find(arg => arg.startsWith(PROTOCOL + '://'));
+      if (url) {
+        mainWindow.webContents.send('deep-link', url);
+      }
+    }
+  });
+
+  // Registra o esquema de protocolo
+  if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [path.resolve(process.argv[1])]);
+    }
+  } else {
+    app.setAsDefaultProtocolClient(PROTOCOL);
+  }
+}
+
+console.log('--- [ELECTRON] Iniciando script main.js ---');
 
 // --- SIMULAÇÃO DE UPDATE (PARA DEV) ---
 function simulateUpdateCycle(win) {
@@ -104,7 +134,43 @@ function createWindow() {
   });
 }
 
+// Configuração de Single Instance Lock e Protocol Client
+const gotTheLock = app.requestSingleInstanceLock();
+const PROTOCOL = 'cbcfmetrics';
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Alguém tentou rodar uma segunda instância, focamos na nossa janela principal
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+    // Opcional: Processar deep link da segunda instância aqui se necessário
+    // const url = commandLine.find(arg => arg.startsWith(PROTOCOL + '://'));
+    // if (url) handleDeepLink(url);
+  });
+
+  // Registra o esquema de protocolo (Deep Link)
+  if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [path.resolve(process.argv[1])]);
+    }
+  } else {
+    app.setAsDefaultProtocolClient(PROTOCOL);
+  }
+
+  app.on('ready', () => {
+    createWindow();
+  });
+}
+
 // --- IPC HANDLERS ---
+ipcMain.on('open-external', (event, url) => {
+  shell.openExternal(url);
+});
+
 ipcMain.on('restart-app', () => {
   // autoUpdater.quitAndInstall();
   console.log('[DEV] Restart solicitado pelo Frontend (Simulado)');
@@ -112,9 +178,18 @@ ipcMain.on('restart-app', () => {
   app.exit();
 });
 
+// macOS Deep Link Handler
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  if (mainWindow) {
+    mainWindow.webContents.send('deep-link', url);
+  }
+});
+
 app.on('ready', () => {
   createWindow();
 });
+
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

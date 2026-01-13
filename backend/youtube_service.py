@@ -54,9 +54,12 @@ class YoutubeApiService(ApiService):
         return flow
 
     # Implementação correta dos métodos abstratos
-    def get_authorization_url(self, user_id: int) -> str:
+    def get_authorization_url(self, user_id: int, callback_url: Optional[str] = None) -> str:
         flow = self._get_flow()
         state_data = {'user_id': str(user_id)}
+        if callback_url:
+            state_data['callback_url'] = callback_url
+            
         encoded_state = base64.urlsafe_b64encode(json.dumps(state_data).encode()).decode()
         authorization_url, _ = flow.authorization_url(
             access_type='offline',

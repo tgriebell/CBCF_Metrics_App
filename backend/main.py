@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, Body, status, APIRouter
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from .database import SessionLocal, engine, Base
 from . import models, schemas
@@ -47,6 +48,65 @@ def login(db: Session = Depends(get_db)):
     # Retorna um token fictício para o ambiente de teste
     return {"access_token": "fake-token", "token_type": "bearer"}
 
+# --- ROTAS DE OAUTH (YouTube & TikTok) ---
+
+@auth_router.get("/{platform}/login")
+def oauth_login(platform: str, callback_url: Optional[str] = None, db: Session = Depends(get_db)):
+    # Usa o usuário de teste fixo para simplificar
+    user = db.query(models.User).filter(models.User.username == "testuser").first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if platform == "youtube":
+        auth_url = youtube_service.get_authorization_url(user.id, callback_url=callback_url)
+        return RedirectResponse(auth_url)
+    elif platform == "tiktok":
+        auth_url = tiktok_service.get_authorization_url(user.id, callback_url=callback_url)
+        return RedirectResponse(auth_url)
+    else:
+        raise HTTPException(status_code=400, detail="Plataforma não suportada")
+
+@auth_router.get("/youtube/callback")
+async def youtube_callback(code: str, state: str, db: Session = Depends(get_db)):
+    try:
+        # Recupera dados do state
+        import base64, json
+        state_data = json.loads(base64.urlsafe_b64decode(state).decode())
+        user_id = int(state_data.get('user_id'))
+        callback_url = state_data.get('callback_url')
+        
+        # Simula a URL de resposta
+        from .config import get_settings
+        settings = get_settings()
+        auth_response_url = f"{settings.YOUTUBE_REDIRECT_URI}?code={code}&state={state}"
+        
+        youtube_service.fetch_and_store_token(auth_response_url, db, user_id, state)
+        
+        # Se houver callback_url (Deep Link), redireciona pra ele
+        if callback_url:
+            # Garante que o callback_url tenha o token de sucesso
+            final_redirect = f"{callback_url}?token=success_yt"
+            return RedirectResponse(url=final_redirect)
+            
+        return RedirectResponse(url="/")
+    except Exception as e:
+        logger.error(f"Erro no callback YouTube: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@auth_router.get("/tiktok/callback")
+async def tiktok_callback(code: str, state: str, db: Session = Depends(get_db)):
+    try:
+        _, callback_url = tiktok_service.fetch_and_store_token(code, state, db)
+        
+        if callback_url:
+            final_redirect = f"{callback_url}?token=success_tk"
+            return RedirectResponse(url=final_redirect)
+            
+        return RedirectResponse(url="/")
+    except Exception as e:
+        logger.error(f"Erro no callback TikTok: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ---------------------------------------
 
 # Configuração CORS
@@ -74,6 +134,14 @@ create_test_user()
 
 # Inclui as rotas de autenticação
 app.include_router(auth_router, prefix="/auth")
+
+@app.get("/auth/desktop_callback")
+def desktop_auth_callback(token: str):
+    """
+    Redireciona para o protocolo do App Desktop (Deep Link) com o token.
+    Uso: O frontend chama este endpoint após receber o token do provedor (ou o provedor redireciona pra cá).
+    """
+    return RedirectResponse(url=f"cbcfmetrics://auth?token={token}")
 
 @app.get("/api/status")
 def read_root():

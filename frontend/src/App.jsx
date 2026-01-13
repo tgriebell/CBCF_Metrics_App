@@ -462,7 +462,7 @@ const SplashScreen = ({ onComplete }) => {
     <main className="fixed inset-0 z-[9999] flex flex-col items-center justify-center splash-bg">
       <section className="splash-logo-card animate-enter">
         <div className="splash-logo-frame">
-          <img src="/img/splash.png" alt="CBCF" className="w-[320px] h-auto object-contain mb-4 drop-shadow-[0_0_15px_rgba(59,245,165,0.15)]" />
+          <img src="img/splash.png" alt="CBCF" className="w-[320px] h-auto object-contain mb-4 drop-shadow-[0_0_15px_rgba(59,245,165,0.15)]" />
           <div className="splash-loader-bar">
             <div className="bar-inner" style={{ width: `${progress}%`, transition: isUpdating ? 'width 0.2s linear' : 'width 0.2s ease-out' }}></div>
           </div>
@@ -630,7 +630,7 @@ const ConnectApisScreen = ({ onEnter, apiStatus, onConnect, dailyVerse, onLogout
           <ConnectionButton 
             platform="tiktok"
             label="TikTok"
-            icon={<img src="/img/tiktok.png" className="w-[24px] h-[24px]" alt="TikTok Icon" />}
+            icon={<img src="img/tiktok.png" className="w-[24px] h-[24px]" alt="TikTok Icon" />}
             isConnected={apiStatus.tiktok}
           />
           <ConnectionButton 
@@ -788,19 +788,19 @@ const PostRow = ({ post, onEdit, onDelete }) => {
 
   if (p.includes('youtube_shorts')) {
     badgeColor = colors.shorts;
-    PlatformIcon = () => <img src="/img/youtubeshorts.png" className="w-4 h-4" />;
+    PlatformIcon = () => <img src="img/youtubeshorts.png" className="w-4 h-4" />;
     platformLabel = 'Shorts';
   } else if (p.includes('youtube_long')) {
     badgeColor = colors.youtube;
-    PlatformIcon = () => <img src="/img/youtube.png" className="w-4 h-4" />;
+    PlatformIcon = () => <img src="img/youtube.png" className="w-4 h-4" />;
     platformLabel = 'Longo';
   } else if (p.includes('tiktok')) {
     badgeColor = colors.tiktok;
-    PlatformIcon = () => <img src="/img/tiktok.png" className="w-4 h-4" />;
+    PlatformIcon = () => <img src="img/tiktok.png" className="w-4 h-4" />;
     platformLabel = 'TikTok';
   } else if (p.includes('instagram')) {
     badgeColor = colors.instagram;
-    PlatformIcon = () => <img src="/img/instagram.png" className="w-4 h-4" />;
+    PlatformIcon = () => <img src="img/instagram.png" className="w-4 h-4" />;
     platformLabel = 'Reels';
   }
 
@@ -950,9 +950,9 @@ const DashboardView = ({
             <Activity size={16} /> Metas do Dia
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <ProfessionalPostGoalCard title="Shorts" current={summary.shorts?.current || 0} goal={summary.shorts?.goal} color={colors.shorts} imgSrc="/img/youtubeshorts.png" />
-          <ProfessionalPostGoalCard title="TikTok" current={summary.tiktok?.current || 0} goal={summary.tiktok?.goal} color={colors.tiktok} imgSrc="/img/tiktok.png" />
-          <ProfessionalPostGoalCard title="YouTube Longo" current={summary.youtube_long?.current || 0} goal={ytLongGoal} color={colors.youtube} imgSrc="/img/youtube.png" />
+          <ProfessionalPostGoalCard title="Shorts" current={summary.shorts?.current || 0} goal={summary.shorts?.goal} color={colors.shorts} imgSrc="img/youtubeshorts.png" />
+          <ProfessionalPostGoalCard title="TikTok" current={summary.tiktok?.current || 0} goal={summary.tiktok?.goal} color={colors.tiktok} imgSrc="img/tiktok.png" />
+          <ProfessionalPostGoalCard title="YouTube Longo" current={summary.youtube_long?.current || 0} goal={ytLongGoal} color={colors.youtube} imgSrc="img/youtube.png" />
         </div>
       </section>
 
@@ -994,13 +994,13 @@ const DashboardView = ({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {(postsPlatformFilter === 'all' || postsPlatformFilter === 'youtube') && (
-                <AudienceCard title="YouTube Principal" count={audience?.youtube_long?.count} growth={audience?.youtube_long?.growth} imgSrc="/img/youtube.png" color={colors.youtube} postsPlatformFilter={postsPlatformFilter} />
+                <AudienceCard title="YouTube Principal" count={audience?.youtube_long?.count} growth={audience?.youtube_long?.growth} imgSrc="img/youtube.png" color={colors.youtube} postsPlatformFilter={postsPlatformFilter} />
               )}
               {(postsPlatformFilter === 'all' || postsPlatformFilter === 'tiktok') && (
-                <AudienceCard title="TikTok" count={audience?.tiktok?.count} growth={audience?.tiktok?.growth} imgSrc="/img/tiktok.png" color={colors.tiktok} postsPlatformFilter={postsPlatformFilter} />
+                <AudienceCard title="TikTok" count={audience?.tiktok?.count} growth={audience?.tiktok?.growth} imgSrc="img/tiktok.png" color={colors.tiktok} postsPlatformFilter={postsPlatformFilter} />
               )}
               {(postsPlatformFilter === 'all' || postsPlatformFilter === 'instagram') && (
-                <AudienceCard title="Instagram" count={audience?.instagram?.count} growth={audience?.instagram?.growth} imgSrc="/img/instagram.png" color={colors.instagram} postsPlatformFilter={postsPlatformFilter} />
+                <AudienceCard title="Instagram" count={audience?.instagram?.count} growth={audience?.instagram?.growth} imgSrc="img/instagram.png" color={colors.instagram} postsPlatformFilter={postsPlatformFilter} />
               )}
             </div>
           </section>
@@ -1346,7 +1346,7 @@ const ManualUpdateModal = ({ isOpen, onClose, onSave, apiBaseUrl }) => {
                   <tr key={day.date} className="bg-white/2 rounded-xl group transition-all hover:bg-white/5">
                     <td className="py-4 pl-4 rounded-l-xl">
                        <span className="text-white font-bold text-sm flex items-center gap-2">
-                         <img src="/img/tiktok.png" className="w-4 h-4 opacity-80" alt="TikTok" />
+                         <img src="img/tiktok.png" className="w-4 h-4 opacity-80" alt="TikTok" />
                          {day.formatted_date}
                        </span>
                     </td>
@@ -1554,8 +1554,16 @@ export default function App() {
 
   const handleConnect = async (platform) => {
     try {
-      // Abre o link de autenticação do backend em uma nova aba
-      window.location.href = `${API_BASE_URL}/auth/${platform}/login?callback_url=${encodeURIComponent(window.location.origin + '/')}`;
+      // URL de autenticação que aponta para o nosso novo callback de desktop
+      const desktopCallback = encodeURIComponent(`${API_BASE_URL}/auth/desktop_callback`);
+      const authUrl = `${API_BASE_URL}/auth/${platform}/login?callback_url=${desktopCallback}`;
+      
+      if (window.electron) {
+        console.log(`--- [AUTH] Abrindo login ${platform} no navegador externo...`);
+        window.electron.openExternal(authUrl);
+      } else {
+        window.location.href = authUrl;
+      }
     } catch (e) {
       console.error(`Erro ao conectar ${platform}:`, e);
       showNotification(`Erro ao conectar ${platform}`, 'error');
@@ -1571,6 +1579,32 @@ export default function App() {
   // Estado para o filtro de plataforma dos posts
   const [postsPlatformFilter, setPostsPlatformFilter] = useState('all');
   const [syncing, setSyncing] = useState(false); // New state to indicate sync in progress
+
+  // Listener para Deep Link (OAuth Desktop)
+  useEffect(() => {
+    if (window.electron) {
+      window.electron.onDeepLink((url) => {
+        console.log("--- [DEEP LINK] Recebido: ", url);
+        try {
+          // O URL vem como cbcfmetrics://auth?token=xyz
+          // Precisamos tratar para extrair o token
+          const queryString = url.split('?')[1];
+          if (queryString) {
+            const params = new URLSearchParams(queryString);
+            const token = params.get('token');
+            if (token) {
+              console.log("--- [DEEP LINK] Token capturado, atualizando status...");
+              showNotification("Conta conectada com sucesso via Desktop!", "success");
+              fetchStatus();
+              fetchData();
+            }
+          }
+        } catch (e) {
+          console.error("Erro ao processar deep link:", e);
+        }
+      });
+    }
+  }, [fetchStatus, fetchData]);
 
   const fetchData = useCallback(async (
     platformFilter = postsPlatformFilter,
