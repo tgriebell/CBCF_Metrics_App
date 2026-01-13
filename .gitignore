@@ -9,6 +9,8 @@
 # Production
 /build
 /dist
+/dist-app
+/backend-dist
 
 # Misc
 .DS_Store
