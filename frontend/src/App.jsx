@@ -448,7 +448,15 @@ const SplashScreen = ({ onComplete }) => {
       const timer = setTimeout(onComplete, 3500);
       return () => { clearTimeout(timer); clearInterval(interval); };
     }
-  }, [onComplete, isUpdating]); // isUpdating adicionado para evitar race condition
+  }, [onComplete, isUpdating]);
+
+  // Monitora conclusão do carregamento (Correção de Lógica)
+  useEffect(() => {
+    if (progress >= 100 && !isUpdating) {
+        const timer = setTimeout(onComplete, 500); // Pequeno delay para ver o 100%
+        return () => clearTimeout(timer);
+    }
+  }, [progress, isUpdating, onComplete]);
 
   return (
     <main className="fixed inset-0 z-[9999] flex flex-col items-center justify-center splash-bg">
