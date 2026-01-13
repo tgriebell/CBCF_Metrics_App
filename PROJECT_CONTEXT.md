@@ -1,29 +1,47 @@
-# CBCF Metrics App - Contexto do Projeto (12/01/2026 - Atualização)
+# CBCF Metrics App - Contexto do Projeto (Atualizado)
 
 ## Visão Geral
-Aplicação Desktop (Electron + React) com Backend Python (FastAPI). Foco em análise estratégica de redes sociais para o Dr. Rafael Evaristo, **Especialista Mundial em Remoção de Papada**.
+Aplicação Desktop (Electron + React) com Backend Python (FastAPI). Foco em análise estratégica de redes sociais para o Dr. Rafael Evaristo.
 
-## Status Atual: Sync YouTube Blindado & Inteligência de Fuso
+## Status Atual: Infraestrutura de Vendas Pronta (Auto-Update Ativo) 🚀
 
-### 🚀 Conquistas Recentes (12/01 - Noite)
-1.  **Correção Crítica no YouTube Sync:**
-    *   Resolvido erro de referência (`NameError`) e chamada de função incorreta (`AttributeError`) no `youtube_service.py`.
-    *   Sincronização profunda agora processa 380+ vídeos corretamente, incluindo novos envios.
-    *   Garantido que vídeos de hoje (12/01) sejam baixados e indexados imediatamente.
+### 🏆 Conquistas (Sessão Atual)
+1.  **Auto-Update OTA (Over-The-Air):**
+    *   Implementado `electron-updater` com GitHub Releases.
+    *   O App detecta novas versões, baixa automaticamente e se instala.
+    *   Splash Screen inteligente com feedback visual de download.
+2.  **Empacotamento Profissional:**
+    *   Backend Python compilado (`main.exe`) via PyInstaller.
+    *   Instalador Windows (`.exe`) gerado via Electron Builder.
+    *   Frontend (Vite) configurado para caminhos relativos (`base: './'`).
+    *   Inclusão segura de `.env` e executáveis dentro do pacote.
+3.  **Segurança:**
+    *   Repositório GitHub configurado como Público para distribuição.
+    *   Chaves sensíveis protegidas via `.gitignore`.
 
-2.  **Inteligência de Fuso Horário (Metas do Dia):**
-    *   **Janela de Tolerância UTC:** Ajustada a rota `/dashboard/summary` no `main.py` para incluir posts até as 04:00 AM do dia seguinte (UTC). 
-    *   **Resultado:** Vídeos postados à noite no Brasil agora são contabilizados corretamente nas metas do dia atual, resolvendo a divergência de contagem (Ex: 4 shorts postados = 4 shorts contados).
+### ⚠️ Pontos de Atenção (Correções para Próxima Sessão)
+1.  **Assets (Imagens Quebradas):**
+    *   Splash Screen e ícones (TikTok) não carregaram no modo Produção.
+    *   *Ação:* Migrar carregamento de imagens de `/public` para `import` direto no React.
+2.  **OAuth em Produção:**
+    *   O botão de conectar YouTube não respondeu no App instalado.
+    *   *Provável Causa:* Redirecionamento de callback configurado apenas para `localhost`.
+    *   *Ação:* Revisar fluxo de OAuth para suportar o ambiente Desktop (`file://` ou Deep Link).
+3.  **Refinamento Visual:**
+    *   O título da janela ainda mostra "Vite + React". Ajustar `index.html`.
 
-3.  **Ambiente de Desenvolvimento Ágil:**
-    *   Implementado o uso do parâmetro `--reload` no Uvicorn. O backend agora reflete qualquer alteração no código instantaneamente sem necessidade de reinício manual.
+## Como Iniciar
+### Modo Desenvolvimento (Para criar novas features)
+1.  Frontend: `npm run dev` (em `frontend/`)
+2.  Electron: `npx electron electron/main.js` (na raiz)
+*   *Nota: O modo simulação de update foi desativado no `main.js`. Reativar se necessário testar visual.*
 
-### 🚧 Próximos Passos (Backlog)
-1.  **Testar Sync Profundo:** Verificar persistência de dados de retenção e inscritos ganhos nos novos vídeos.
-2.  **Instagram Integration:** Módulo de captura de Reels (em planejamento).
-3.  **Organização de Arquivos:** Avaliar limpeza de scripts de debug da raiz para pastas auxiliares.
+### Modo Produção (Para gerar versão para cliente)
+1.  Atualizar versão no `package.json`.
+2.  Commitar mudanças.
+3.  Terminal Admin: `npm run dist`
+4.  Publicar `.exe` e `latest.yml` no GitHub Releases.
 
-## Como Iniciar (Modo Desenvolvedor)
-1.  **Backend (Com Auto-Reload):** 
-    `python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --ssl-keyfile localhost+2-key.pem --ssl-certfile localhost+2.pem --reload`
-2.  **Frontend:** No diretório `frontend`, rode `npm run dev`.
+## Próximos Passos Prioritários
+1.  Corrigir caminhos de imagens (Assets).
+2.  Debugar fluxo de OAuth do YouTube no executável final.
