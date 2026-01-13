@@ -134,37 +134,7 @@ function createWindow() {
   });
 }
 
-// Configuração de Single Instance Lock e Protocol Client
-const gotTheLock = app.requestSingleInstanceLock();
-const PROTOCOL = 'cbcfmetrics';
 
-if (!gotTheLock) {
-  app.quit();
-} else {
-  app.on('second-instance', (event, commandLine, workingDirectory) => {
-    // Alguém tentou rodar uma segunda instância, focamos na nossa janela principal
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    }
-    // Opcional: Processar deep link da segunda instância aqui se necessário
-    // const url = commandLine.find(arg => arg.startsWith(PROTOCOL + '://'));
-    // if (url) handleDeepLink(url);
-  });
-
-  // Registra o esquema de protocolo (Deep Link)
-  if (process.defaultApp) {
-    if (process.argv.length >= 2) {
-      app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [path.resolve(process.argv[1])]);
-    }
-  } else {
-    app.setAsDefaultProtocolClient(PROTOCOL);
-  }
-
-  app.on('ready', () => {
-    createWindow();
-  });
-}
 
 // --- IPC HANDLERS ---
 ipcMain.on('open-external', (event, url) => {
@@ -186,9 +156,7 @@ app.on('open-url', (event, url) => {
   }
 });
 
-app.on('ready', () => {
-  createWindow();
-});
+
 
 
 app.on('window-all-closed', () => {
