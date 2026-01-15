@@ -3,28 +3,27 @@
 ## Visão Geral
 Aplicação Desktop (Electron + React) com Backend Python (FastAPI). Foco em análise estratégica de redes sociais para o Dr. Rafael Evaristo.
 
-## Status Atual: Infraestrutura de Vendas Pronta (Auto-Update Ativo) 🚀
+## Status Atual: Infraestrutura Sólida, Bug de Frontend em Prod 🚧
 
-### 🏆 Conquistas (Sessão Atual)
-1.  **Login OAuth Profissional (Desktop Deep Linking):**
-    *   Implementado protocolo customizado `cbcfmetrics://` para captura de tokens.
-    *   O App agora abre o navegador padrão do sistema para autenticação (YouTube/TikTok), evitando bloqueios de segurança.
-    *   Fluxo de retorno automático do navegador para o App Desktop concluído.
+### 🏆 Conquistas (Sessão Anterior)
+1.  **Login OAuth Profissional (Deep Linking):**
+    *   Protocolo `cbcfmetrics://` registrado e funcional.
+    *   Backend redireciona corretamente para o App Desktop.
+    *   Frontend configurado para ouvir o Deep Link.
 2.  **Instalador Premium (NSIS):**
-    *   Configurado assistente de instalação com telas de boas-vindas e seleção de diretório.
-    *   Fim da instalação "silenciosa" antiprofissional.
-3.  **Assets Corrigidos:**
-    *   Migração de caminhos absolutos para relativos em todo o Frontend, garantindo que imagens carreguem no modo Produção (`file://`).
-4.  **Auto-Update OTA (Over-The-Air):**
-    *   Mantida infraestrutura de atualização automática via GitHub Releases.
+    *   Assistente de instalação visual (não mais silencioso) implementado.
+    *   Inicialização do Electron (`main.js`) corrigida na v1.0.4.
+3.  **Assets:** Caminhos relativos configurados.
 
-### ⚠️ Pontos de Atenção (Próxima Sessão)
-1.  **Integração Instagram:**
-    *   Implementar serviço de API e fluxo de OAuth para Instagram.
-2.  **Setup de Customização (White-Label):**
-    *   Criar tela inicial de configuração para permitir que o app seja personalizado por cliente (Logo, Cores, APIs).
-3.  **Assinatura de Código (Code Signing):**
-    *   Considerar aquisição de certificado para remover o alerta de "Editor Desconhecido" do Windows SmartScreen.
+### ⚠️ Pontos de Atenção (PRIORIDADE MÁXIMA - Próxima Sessão)
+1.  **Bug Crítico no Frontend (Produção):**
+    *   Erro: `ReferenceError: Cannot access 'B' before initialization` (Tela Azul da Morte).
+    *   Causa Provável: Dependência circular ou ordem de importação errada em componentes React ao serem minificados pelo Vite (Build de Produção).
+    *   *Ação:* Debugar imports no `App.jsx` e componentes (possivelmente Recharts ou ícones Lucide).
+2.  **Integração Instagram:**
+    *   Pendente implementação completa.
+3.  **Setup White-Label:**
+    *   Planejado para futuro.
 
 ## Como Iniciar
 ### Modo Desenvolvimento (Para criar novas features)
@@ -33,10 +32,11 @@ Aplicação Desktop (Electron + React) com Backend Python (FastAPI). Foco em an�
 3.  Electron: `npx electron electron/main.js` (na raiz)
 
 ### Modo Produção (Para gerar versão para cliente)
-1.  Atualizar versão no `package.json`.
-2.  Commitar mudanças no Git.
-3.  Terminal Admin: `npm run dist`
-4.  Publicar `.exe`, `latest.yml` e `blockmap` no GitHub Releases.
+1.  **Resolver o Bug de Frontend primeiro!**
+2.  Atualizar versão no `package.json`.
+3.  Commitar mudanças.
+4.  Terminal Admin: `npm run dist`
+5.  Publicar `.exe`, `latest.yml` e `blockmap` no GitHub Releases.
 
 ## Próximos Passos Prioritários
 1.  Corrigir caminhos de imagens (Assets).
