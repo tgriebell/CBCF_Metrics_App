@@ -1,6 +1,6 @@
 {
   "name": "cbcf-metrics-app",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Painel de M�tricas e Metas CBCF",
   "main": "electron/main.js",
   "author": "Thiago Griebel",

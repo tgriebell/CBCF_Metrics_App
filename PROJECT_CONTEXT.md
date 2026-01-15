@@ -14,16 +14,20 @@ Aplicação Desktop (Electron + React) com Backend Python (FastAPI). Foco em an�
     *   Assistente de instalação visual (não mais silencioso) implementado.
     *   Inicialização do Electron (`main.js`) corrigida na v1.0.4.
 3.  **Assets:** Caminhos relativos configurados.
+4.  **Bug Crítico no Frontend (Tela Azul/Build):**
+    *   *Correção Aplicada:* Configuração do Vite (`vite.config.js`) ajustada para separar `recharts` e `lucide-react` em chunks manuais. Isso previne o erro de inicialização cíclica em produção.
+    *   **Versão Atual:** `v1.0.5` (Pronta para Build).
 
-### ⚠️ Pontos de Atenção (PRIORIDADE MÁXIMA - Próxima Sessão)
-1.  **Bug Crítico no Frontend (Produção):**
-    *   Erro: `ReferenceError: Cannot access 'B' before initialization` (Tela Azul da Morte).
-    *   Causa Provável: Dependência circular ou ordem de importação errada em componentes React ao serem minificados pelo Vite (Build de Produção).
-    *   *Ação:* Debugar imports no `App.jsx` e componentes (possivelmente Recharts ou ícones Lucide).
+### ⚠️ Próximos Passos (Imediato)
+1.  **Build & Deploy (v1.0.5):**
+    *   Rodar `npm run dist` para gerar o executável corrigido.
+    *   Commitar mudanças: `git commit -m "chore: bump version to 1.0.5 - fix frontend build error"`.
+    *   Publicar a Release v1.0.5 no GitHub.
+    *   Testar se o erro de "Tela Azul" desapareceu.
 2.  **Integração Instagram:**
     *   Pendente implementação completa.
-3.  **Setup White-Label:**
-    *   Planejado para futuro.
+3.  **Testar Fluxo TikTok End-to-End:**
+    *   Validar se o token está sendo salvo e os dados carregados corretamente no app final.
 
 ## Como Iniciar
 ### Modo Desenvolvimento (Para criar novas features)
