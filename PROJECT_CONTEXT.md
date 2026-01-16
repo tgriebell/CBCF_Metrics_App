@@ -19,9 +19,28 @@ Aplicação Desktop (Electron + React) com Backend Python (FastAPI). Foco em an�
     *   **Workflow unificado:** O comando `npm run dist` agora orquestra automaticamente o build do React, a compilação do Python via PyInstaller e o empacotamento final NSIS.
     *   **Correção de ENOENT:** Alinhados os caminhos do `extraResources` no Electron Builder para garantir que o executável do backend seja incluído corretamente na pasta de destino esperada.
 2.  **Estabilidade e Infraestrutura:**
-    *   **Backend Blindado:** Lógica de imports e carregamento de certificados SSL/Env consolidada para modo executável.
+    *   **Backend Blindado:** Lógica de imports e carregamento de certificados SSL/Env consolidada para modo executável (correção de `attempted relative import`).
     *   **UX Refinada:** Splash screen orgânico e correção de carregamento de fontes.
+    *   **Diagnóstico:** Implementado popup de erro no Electron para capturar falhas do Python.
     *   **Versão v1.1.4:** Atualizada e pronta para distribuição.
+
+### 🚧 Ponto de Bloqueio (PERSISTENTE)
+1.  **Erro no Executável Final (v1.1.4):**
+    *   *Sintoma:* Mesmo após todas as correções de caminho, imports e automação de build, o app final ainda apresenta erro (janela em branco ou falha de conexão).
+    *   *Hipótese:* O PyInstaller pode estar deixando de fora alguma DLL crítica, ou o caminho dos certificados/banco de dados ainda não está 100% resolvido dentro do ambiente congelado `_MEIPASS`. Pode ser também um problema de permissão de escrita no banco de dados (`cbcf_metrics.db`) se ele estiver tentando criar na pasta `Program Files` (que é somente leitura).
+    *   *Ação Prioritária (Próxima Sessão):*
+        *   Rodar o executável instalado via terminal (Powershell) para ver o output real se o popup não aparecer.
+        *   Verificar se o banco de dados SQLite está sendo criado em um local gravável (`%APPDATA%`) e não na pasta de instalação.
+
+## Como Iniciar
+### Modo Desenvolvimento (Para criar novas features)
+1.  Backend: `python -m backend.main` (na raiz)
+2.  Frontend: `npm run dev` (em `frontend/`)
+3.  Electron: `npx electron electron/main.js` (na raiz)
+
+### Modo Produção (Para gerar versão para cliente)
+1.  Comando único: `npm run dist`
+2.  O instalador estará em `dist-app/`.
 
 ### 🚧 Status: Pronto para Teste de Produção 🚀
 1.  **Erro de Conexão (YouTube/TikTok):**
