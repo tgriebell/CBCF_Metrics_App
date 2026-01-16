@@ -6,10 +6,16 @@ import json
 import os
 from urllib.parse import urlencode, unquote
 
-from .base_service import ApiService
-from .config import get_settings
-from .models import Credential
-from sqlalchemy.orm import Session
+try:
+    from .base_service import ApiService
+    from .config import get_settings
+    from .models import Credential
+    from sqlalchemy.orm import Session
+except ImportError:
+    from base_service import ApiService
+    from config import get_settings
+    from models import Credential
+    from sqlalchemy.orm import Session
 
 settings = get_settings()
 

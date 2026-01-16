@@ -13,10 +13,16 @@ from google_auth_httplib2 import AuthorizedHttp
 import httplib2
 
 # Local imports
-from .config import get_settings
-from .models import Credential, Post, FollowerHistory
-from sqlalchemy.orm import Session
-from .base_service import ApiService
+try:
+    from .config import get_settings
+    from .models import Credential, Post, FollowerHistory
+    from sqlalchemy.orm import Session
+    from .base_service import ApiService
+except ImportError:
+    from config import get_settings
+    from models import Credential, Post, FollowerHistory
+    from sqlalchemy.orm import Session
+    from base_service import ApiService
 
 settings = get_settings()
 

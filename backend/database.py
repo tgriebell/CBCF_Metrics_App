@@ -1,7 +1,11 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from .config import get_settings
-from .models import Base
+try:
+    from .config import get_settings
+    from .models import Base
+except ImportError:
+    from config import get_settings
+    from models import Base
 
 settings = get_settings()
 

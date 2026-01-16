@@ -1,5 +1,9 @@
 import google.generativeai as genai
-from .config import get_settings
+try:
+    from .config import get_settings
+except ImportError:
+    from config import get_settings
+
 import os
 import time
 import json
