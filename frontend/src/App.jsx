@@ -60,7 +60,7 @@ const TitleBar = () => (
   <div className="h-8 flex items-center justify-between px-3 bg-[#020715] border-b border-white/5 select-none fixed top-0 left-0 right-0 z-[9999]" style={{ WebkitAppRegion: 'drag' }}>
     <div className="flex items-center gap-2 pl-1">
       <div className="w-2 h-2 rounded-full bg-[#3bf5a5] shadow-[0_0_8px_#3bf5a5]"></div>
-      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest font-mono">CBCF System v1.0.8</span>
+      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest font-mono">CBCF System v1.0.9</span>
     </div>
     <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' }}>
       <button onClick={() => window.electron?.minimize()} className="p-1.5 hover:bg-white/10 rounded text-gray-500 hover:text-white transition-colors"><Minus size={10} /></button>
@@ -1598,32 +1598,6 @@ export default function App() {
   const [postsPlatformFilter, setPostsPlatformFilter] = useState('all');
   const [syncing, setSyncing] = useState(false); // New state to indicate sync in progress
 
-  // Listener para Deep Link (OAuth Desktop)
-  useEffect(() => {
-    if (window.electron) {
-      window.electron.onDeepLink((url) => {
-        console.log("--- [DEEP LINK] Recebido: ", url);
-        try {
-          // O URL vem como cbcfmetrics://auth?token=xyz
-          // Precisamos tratar para extrair o token
-          const queryString = url.split('?')[1];
-          if (queryString) {
-            const params = new URLSearchParams(queryString);
-            const token = params.get('token');
-            if (token) {
-              console.log("--- [DEEP LINK] Token capturado, atualizando status...");
-              showNotification("Conta conectada com sucesso via Desktop!", "success");
-              fetchStatus();
-              fetchData();
-            }
-          }
-        } catch (e) {
-          console.error("Erro ao processar deep link:", e);
-        }
-      });
-    }
-  }, [fetchStatus, fetchData]);
-
   const fetchData = useCallback(async (
     platformFilter = postsPlatformFilter,
     startMonthly = monthlyStartDate,
@@ -1668,6 +1642,32 @@ export default function App() {
       console.error("Falha geral ao despachar buscas:", e);
     }
   }, [postsPlatformFilter, monthlyStartDate, monthlyEndDate]);
+
+  // Listener para Deep Link (OAuth Desktop)
+  useEffect(() => {
+    if (window.electron) {
+      window.electron.onDeepLink((url) => {
+        console.log("--- [DEEP LINK] Recebido: ", url);
+        try {
+          // O URL vem como cbcfmetrics://auth?token=xyz
+          // Precisamos tratar para extrair o token
+          const queryString = url.split('?')[1];
+          if (queryString) {
+            const params = new URLSearchParams(queryString);
+            const token = params.get('token');
+            if (token) {
+              console.log("--- [DEEP LINK] Token capturado, atualizando status...");
+              showNotification("Conta conectada com sucesso via Desktop!", "success");
+              fetchStatus();
+              fetchData();
+            }
+          }
+        } catch (e) {
+          console.error("Erro ao processar deep link:", e);
+        }
+      });
+    }
+  }, [fetchStatus, fetchData]);
 
   const handleSync = useCallback(async () => {
     setSyncing(true);

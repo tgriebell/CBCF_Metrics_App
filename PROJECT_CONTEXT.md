@@ -15,16 +15,16 @@ Aplicação Desktop (Electron + React) com Backend Python (FastAPI). Foco em an�
     *   Inicialização do Electron (`main.js`) corrigida na v1.0.4.
 3.  **Assets:** Caminhos relativos configurados.
 4.  **Bug Crítico no Frontend (Tela Azul/Build):**
-    *   *Correção Aplicada:* Configuração do Vite (`vite.config.js`) simplificada para evitar conflitos de `manualChunks`.
-    *   *Downgrade:* Recharts revertido para `2.12.7` (estável).
-    *   *Visual:* App configurado para iniciar maximizado e sem moldura (`frame: false`).
-    *   **Versão Atual:** `v1.0.7` (Pronta para Build).
+    *   *Correção Aplicada:* Ajuste de "Hoisting" no `App.jsx`. A função `fetchData` foi movida para antes do `useEffect` que a invoca, resolvendo o erro `Cannot access 'fetchData' before initialization`.
+    *   *Correção Visual:* Implementado modo Frameless com TitleBar customizada e funcional (v1.0.9).
+    *   *Recharts:* Estável na v2.12.7.
+    *   **Versão Atual:** `v1.0.9` (Pronta para Build).
 
 ### ⚠️ Próximos Passos (Imediato)
-1.  **Build & Deploy (v1.0.7):**
+1.  **Build & Deploy (v1.0.9):**
     *   Rodar `npm run dist` (com cache limpo).
-    *   Commitar mudanças: `git commit -m "chore: bump version to 1.0.7 - fix white screen and visual improvements"`.
-    *   Publicar a Release v1.0.7 no GitHub.
+    *   Commitar mudanças: `git commit -m "fix: move fetchData definition before usage - v1.0.9"`.
+    *   Publicar a Release v1.0.9 no GitHub.
 2.  **Integração Instagram:**
     *   Pendente implementação completa.
 3.  **Testar Fluxo TikTok End-to-End:**
