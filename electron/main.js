@@ -107,6 +107,8 @@ function createWindow() {
     backgroundColor: '#020715',
     title: 'CBCF Metrics - Pro System',
     icon: iconPath,
+    frame: false, // REMOVE A MOLDURA DO WINDOWS
+    titleBarStyle: 'hidden', // Oculta a barra nativa, mas mantem area de drag
     show: false, // Só mostra quando estiver pronta
     webPreferences: {
       nodeIntegration: false, // Segurança: ON
@@ -114,6 +116,14 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js') // Ponte: ON
     },
   });
+
+  // --- CONTROLES DE JANELA CUSTOMIZADOS ---
+  ipcMain.on('window-minimize', () => mainWindow.minimize());
+  ipcMain.on('window-maximize', () => {
+    if (mainWindow.isMaximized()) mainWindow.unmaximize();
+    else mainWindow.maximize();
+  });
+  ipcMain.on('window-close', () => mainWindow.close());
 
   // Carregamento
   if (!app.isPackaged) {

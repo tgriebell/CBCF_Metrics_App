@@ -9,5 +9,10 @@ contextBridge.exposeInMainWorld('electron', {
   // Envia mensagens para o Processo Principal
   checkUpdate: () => ipcRenderer.send('check-for-update'),
   restartApp: () => ipcRenderer.send('restart-app'),
-  openExternal: (url) => ipcRenderer.send('open-external', url)
+  openExternal: (url) => ipcRenderer.send('open-external', url),
+  
+  // Controles de Janela Customizados
+  minimize: () => ipcRenderer.send('window-minimize'),
+  maximize: () => ipcRenderer.send('window-maximize'),
+  close: () => ipcRenderer.send('window-close')
 });

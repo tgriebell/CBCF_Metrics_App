@@ -50,8 +50,26 @@ import {
   Share2, // Adicionado
   Edit, // Adicionado
   MoreHorizontal, // Adicionado
-  Video // Adicionado
+  Video, // Adicionado
+  Minus, // TitleBar
+  Square // TitleBar
 } from 'lucide-react';
+
+// --- BARRA DE TÍTULO CUSTOMIZADA (FRAMELESS) ---
+const TitleBar = () => (
+  <div className="h-8 flex items-center justify-between px-3 bg-[#020715] border-b border-white/5 select-none fixed top-0 left-0 right-0 z-[9999]" style={{ WebkitAppRegion: 'drag' }}>
+    <div className="flex items-center gap-2 pl-1">
+      <div className="w-2 h-2 rounded-full bg-[#3bf5a5] shadow-[0_0_8px_#3bf5a5]"></div>
+      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest font-mono">CBCF System v1.0.6</span>
+    </div>
+    <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' }}>
+      <button onClick={() => window.electron?.minimize()} className="p-1.5 hover:bg-white/10 rounded text-gray-500 hover:text-white transition-colors"><Minus size={10} /></button>
+      <button onClick={() => window.electron?.maximize()} className="p-1.5 hover:bg-white/10 rounded text-gray-500 hover:text-white transition-colors"><Square size={8} /></button>
+      <button onClick={() => window.electron?.close()} className="p-1.5 hover:bg-red-500/20 rounded text-gray-500 hover:text-red-400 transition-colors"><X size={10} /></button>
+    </div>
+  </div>
+);
+
 // --- CONFIGURAÇÃO DE CORES (REGRAS FINAIS) ---
 const colors = {
   bg: '#0D1117',
@@ -1760,12 +1778,14 @@ export default function App() {
   return (
     <>
       <GlobalStyles />
-      {screen === 'splash' && <SplashScreen onComplete={() => setScreen('login')} />}
-      {screen === 'login' && <LoginScreen onLogin={handleLogin} />}
-      {screen === 'connect' && <ConnectApisScreen onEnter={() => setScreen('app')} apiStatus={apiStatus} onConnect={handleConnect} dailyVerse={dailyVerse} onLogout={handleLogout} />}
-      {screen === 'app' && (
-        <div className="flex h-screen overflow-hidden bg-transparent">
-          <aside className="w-64 flex-shrink-0 flex flex-col glass-panel border-r-0 m-4 rounded-2xl relative z-20">
+      <TitleBar />
+      <div className="pt-8 h-screen flex flex-col"> {/* Container Global com padding para TitleBar */}
+        {screen === 'splash' && <SplashScreen onComplete={() => setScreen('login')} />}
+        {screen === 'login' && <LoginScreen onLogin={handleLogin} />}
+        {screen === 'connect' && <ConnectApisScreen onEnter={() => setScreen('app')} apiStatus={apiStatus} onConnect={handleConnect} dailyVerse={dailyVerse} onLogout={handleLogout} />}
+        {screen === 'app' && (
+          <div className="flex flex-1 overflow-hidden bg-transparent">
+            <aside className="w-64 flex-shrink-0 flex flex-col glass-panel border-r-0 m-4 rounded-2xl relative z-20">
             <div className="p-6">
                <h1 className="text-xl font-bold text-white italic tracking-tight">CBCF <span className="text-[#3bf5a5]">METRICS</span></h1>
                <div className="flex items-center gap-2 mt-2">
@@ -1956,6 +1976,7 @@ export default function App() {
           </main>
         </div>
       )}
+      </div> {/* Fecha Container Global */}
 
       {/* Notificação Global - Funciona em todas as telas */}
       {notification && (

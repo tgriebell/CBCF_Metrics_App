@@ -987,4 +987,16 @@ async def analyze_patterns(platform: str = "youtube", user: models.User = Depend
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=True)
+    import os
+    
+    # Verifica se os certificados existem (Dev ou Prod)
+    key_file = "localhost+2-key.pem"
+    cert_file = "localhost+2.pem"
+    
+    # Se estiver rodando pelo PyInstaller, os arquivos podem estar na mesma pasta do executável
+    if os.path.exists(key_file) and os.path.exists(cert_file):
+        print(f"Iniciando servidor seguro (HTTPS) na porta 8000...")
+        uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, ssl_keyfile=key_file, ssl_certfile=cert_file, reload=False)
+    else:
+        print(f"AVISO: Certificados SSL não encontrados. Iniciando em HTTP (Inseguro) na porta 8000...")
+        uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=True)
