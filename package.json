@@ -1,6 +1,6 @@
 {
   "name": "cbcf-metrics-app",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "description": "Painel de M�tricas e Metas CBCF",
   "main": "electron/main.js",
   "author": "Thiago Griebel",
@@ -15,7 +15,8 @@
     "dev:frontend": "cd frontend && npm run dev",
     "dev:electron": "electron .",
     "build:frontend": "cd frontend && npm run build",
-    "dist": "npm run build:frontend && electron-builder"
+    "build:backend": "pyinstaller --noconfirm main.spec",
+    "dist": "npm run build:frontend && npm run build:backend && electron-builder"
   },
   "build": {
     "publish": {
@@ -53,12 +54,8 @@
     },
     "extraResources": [
       {
-        "from": "backend-dist",
-        "to": "backend-dist"
-      },
-      {
-        "from": "backend/.env",
-        "to": "backend/.env"
+        "from": "dist/main.exe",
+        "to": "backend-dist/main.exe"
       }
     ]
   },

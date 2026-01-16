@@ -14,14 +14,14 @@ Aplicação Desktop (Electron + React) com Backend Python (FastAPI). Foco em an�
     *   Assistente de instalação visual (não mais silencioso) implementado.
     *   Inicialização do Electron (`main.js`) corrigida na v1.0.4.
 3.  **Assets:** Caminhos relativos configurados.
-### 🏆 Conquistas (Sessão Atual - v1.1.3)
-1.  **Estabilidade Visual e UX:**
-    *   **Splash Screen Orgânico:** Implementada animação de carregamento fluida com "fake loading" para evitar saltos bruscos.
-    *   **Correção de Assets:** Fontes e caminhos de arquivos ajustados para modo relativo.
-2.  **Infraestrutura e Backend (FIX CRÍTICO):**
-    *   **Blindagem de Imports:** Implementada lógica `try/except ImportError` em todos os serviços (YouTube, TikTok, Gemini, Database) para suportar importações absolutas no modo executável (.exe). Isso resolve o erro `attempted relative import with no known parent package`.
-    *   **Limpeza de Cache:** Build realizado após limpeza completa das pastas `build/` e `dist/`.
-    *   **Versão v1.1.3:** Registrada e sincronizada.
+### 🏆 Conquistas (Sessão Atual - v1.1.4)
+1.  **Automação de Build Completa:**
+    *   **Workflow unificado:** O comando `npm run dist` agora orquestra automaticamente o build do React, a compilação do Python via PyInstaller e o empacotamento final NSIS.
+    *   **Correção de ENOENT:** Alinhados os caminhos do `extraResources` no Electron Builder para garantir que o executável do backend seja incluído corretamente na pasta de destino esperada.
+2.  **Estabilidade e Infraestrutura:**
+    *   **Backend Blindado:** Lógica de imports e carregamento de certificados SSL/Env consolidada para modo executável.
+    *   **UX Refinada:** Splash screen orgânico e correção de carregamento de fontes.
+    *   **Versão v1.1.4:** Atualizada e pronta para distribuição.
 
 ### 🚧 Status: Pronto para Teste de Produção 🚀
 1.  **Erro de Conexão (YouTube/TikTok):**
