@@ -116,6 +116,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js') // Ponte: ON
     },
   });
+  
+  mainWindow.maximize(); // FORÇA INICIAR MAXIMIZADO
 
   // --- CONTROLES DE JANELA CUSTOMIZADOS ---
   ipcMain.on('window-minimize', () => mainWindow.minimize());

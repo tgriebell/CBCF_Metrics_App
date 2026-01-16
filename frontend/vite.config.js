@@ -7,13 +7,20 @@ export default defineConfig({
   base: './',
   plugins: [ react(), basicSsl() ],
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          recharts: ['recharts'],
-          lucide: ['lucide-react'],
-        },
-      },
+    minify: false, // DESLIGA MINIFICAÇÃO TOTALMENTE (Teste de Debug)
+    terserOptions: {
+      compress: false,
+      mangle: false,
     },
+    rollupOptions: {
+      // Garante que o Recharts não seja quebrado
+      output: {
+        manualChunks: undefined,
+        format: 'es', // Garante formato de módulo padrão
+      }
+    },
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    }
   },
 })

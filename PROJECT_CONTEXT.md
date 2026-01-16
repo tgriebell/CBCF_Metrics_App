@@ -15,15 +15,16 @@ Aplicação Desktop (Electron + React) com Backend Python (FastAPI). Foco em an�
     *   Inicialização do Electron (`main.js`) corrigida na v1.0.4.
 3.  **Assets:** Caminhos relativos configurados.
 4.  **Bug Crítico no Frontend (Tela Azul/Build):**
-    *   *Correção Aplicada:* Configuração do Vite (`vite.config.js`) ajustada para separar `recharts` e `lucide-react` em chunks manuais. Isso previne o erro de inicialização cíclica em produção.
-    *   **Versão Atual:** `v1.0.5` (Pronta para Build).
+    *   *Correção Aplicada:* Configuração do Vite (`vite.config.js`) simplificada para evitar conflitos de `manualChunks`.
+    *   *Downgrade:* Recharts revertido para `2.12.7` (estável).
+    *   *Visual:* App configurado para iniciar maximizado e sem moldura (`frame: false`).
+    *   **Versão Atual:** `v1.0.7` (Pronta para Build).
 
 ### ⚠️ Próximos Passos (Imediato)
-1.  **Build & Deploy (v1.0.5):**
-    *   Rodar `npm run dist` para gerar o executável corrigido.
-    *   Commitar mudanças: `git commit -m "chore: bump version to 1.0.5 - fix frontend build error"`.
-    *   Publicar a Release v1.0.5 no GitHub.
-    *   Testar se o erro de "Tela Azul" desapareceu.
+1.  **Build & Deploy (v1.0.7):**
+    *   Rodar `npm run dist` (com cache limpo).
+    *   Commitar mudanças: `git commit -m "chore: bump version to 1.0.7 - fix white screen and visual improvements"`.
+    *   Publicar a Release v1.0.7 no GitHub.
 2.  **Integração Instagram:**
     *   Pendente implementação completa.
 3.  **Testar Fluxo TikTok End-to-End:**
