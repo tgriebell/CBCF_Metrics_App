@@ -1,9 +1,15 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 import os # Importar 'os'
+import sys
 
-# Define BASE_DIR aqui para ser usado no SettingsConfigDict
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Define BASE_DIR compatível com PyInstaller
+def get_base_path():
+    if hasattr(sys, '_MEIPASS'):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(__file__))
+
+BASE_DIR = get_base_path()
 
 class Settings(BaseSettings):
     # Base de Dados

@@ -3,6 +3,10 @@ const path = require('path');
 const { spawn } = require('child_process');
 // const { autoUpdater } = require('electron-updater'); // Descomentar quando instalar
 
+// Permite certificados auto-assinados (necessário para o Backend Python em HTTPS)
+app.commandLine.appendSwitch('allow-insecure-localhost', 'true');
+app.commandLine.appendSwitch('ignore-certificate-errors');
+
 const PROTOCOL = 'cbcfmetrics';
 let mainWindow;
 let apiProcess;

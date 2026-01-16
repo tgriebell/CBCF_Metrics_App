@@ -14,19 +14,25 @@ Aplicação Desktop (Electron + React) com Backend Python (FastAPI). Foco em an�
     *   Assistente de instalação visual (não mais silencioso) implementado.
     *   Inicialização do Electron (`main.js`) corrigida na v1.0.4.
 3.  **Assets:** Caminhos relativos configurados.
-4.  **Bug Crítico no Frontend (Tela Azul/Build):**
-    *   *Correção Aplicada:* Ajuste de "Hoisting" no `App.jsx`. A função `fetchData` foi movida para antes do `useEffect` que a invoca, resolvendo o erro `Cannot access 'fetchData' before initialization`.
-    *   *Correção Visual:* Implementado modo Frameless com TitleBar customizada e funcional (v1.0.9).
-    *   *Recharts:* Estável na v2.12.7.
-    *   **Versão Atual:** `v1.0.9` (Pronta para Build).
+### 🏆 Conquistas (Sessão Atual - v1.1.1)
+1.  **Estabilidade Visual e Funcional:**
+    *   **Tela Azul (Recharts) Resolvida:** Downgrade para v2.12.7 + limpeza de build Vite eliminou o erro crítico de inicialização.
+    *   **Visual Premium:** Implementado modo *Frameless* (sem moldura Windows) com barra de título customizada e funcional (Minimizar/Maximizar/Fechar).
+    *   **App Maximizado:** Configurado para iniciar em tela cheia.
+    *   **Versão e Data:** Tela de login agora mostra a versão real (`v1.1.1`) e a data de compilação congelada (`15/01/2026`).
+2.  **Infraestrutura e Conectividade (FIX CRÍTICO):**
+    *   **Correção de SSL no Executável:** Adicionada lógica de `sys._MEIPASS` no backend para encontrar certificados `.pem` e arquivo `.env` dentro do `.exe`.
+    *   **Build NSIS (main.spec):** Configurado para incluir arquivos de segurança no pacote final.
+    *   **Permissões Electron:** Adicionada flag `allow-insecure-localhost` para aceitar a conexão segura local.
 
-### ⚠️ Próximos Passos (Imediato)
-1.  **Build & Deploy (v1.0.9):**
-    *   Rodar `npm run dist` (com cache limpo).
-    *   Commitar mudanças: `git commit -m "fix: move fetchData definition before usage - v1.0.9"`.
-    *   Publicar a Release v1.0.9 no GitHub.
-2.  **Integração Instagram:**
-    *   Pendente implementação completa.
+### 🚧 Status: Pronto para Teste de Produção 🚀
+1.  **Erro de Conexão (YouTube/TikTok):**
+    *   *Ação realizada:* Ajustado empacotamento e permissões. O app deve agora conectar ao backend HTTPS sem recusa.
+
+### Próximos Passos
+1.  Resolver a conexão Backend <-> Frontend (Decisão HTTP vs HTTPS).
+2.  Testar o fluxo de OAuth do YouTube e TikTok até o fim.
+3.  Iniciar Integração Instagram.
 3.  **Testar Fluxo TikTok End-to-End:**
     *   Validar se o token está sendo salvo e os dados carregados corretamente no app final.
 

@@ -5,7 +5,11 @@ a = Analysis(
     ['backend\\main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[
+        ('localhost+2.pem', '.'),
+        ('localhost+2-key.pem', '.'),
+        ('backend/.env', '.'),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
