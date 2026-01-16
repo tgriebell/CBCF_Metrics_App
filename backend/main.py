@@ -1,12 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Body, status, APIRouter
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
-from .database import SessionLocal, engine, Base
-from . import models, schemas
-from .youtube_service import youtube_service
-from .tiktok_service import tiktok_service
-from .gemini_service import gemini_service
-from .data_analytics_gemini_service import data_analytics_service
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from typing import List, Optional
@@ -15,6 +9,27 @@ import logging
 # Configuração de logs
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# --- CORREÇÃO DE IMPORTS (DEV vs EXE) ---
+# Tenta imports relativos (Dev/Module) e falha para absolutos (Exe/Script)
+try:
+    from .database import SessionLocal, engine, Base
+    from . import models, schemas
+    from .youtube_service import youtube_service
+    from .tiktok_service import tiktok_service
+    from .gemini_service import gemini_service
+    from .data_analytics_gemini_service import data_analytics_service
+except ImportError:
+    # Fallback para execução direta (PyInstaller)
+    from database import SessionLocal, engine, Base
+    import models, schemas
+    from youtube_service import youtube_service
+    from tiktok_service import tiktok_service
+    from gemini_service import gemini_service
+    from data_analytics_gemini_service import data_analytics_service
+    
+    # Ajuste para models encontrar a config corretamente se necessário
+    pass
 
 # Cria as tabelas no banco de dados se não existirem
 print("Creating database tables...")
