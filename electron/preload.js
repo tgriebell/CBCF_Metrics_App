@@ -14,5 +14,8 @@ contextBridge.exposeInMainWorld('electron', {
   // Controles de Janela Customizados
   minimize: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
-  close: () => ipcRenderer.send('window-close')
+  close: () => ipcRenderer.send('window-close'),
+
+  // Sistema
+  getAppVersion: () => ipcRenderer.invoke('get-app-version')
 });

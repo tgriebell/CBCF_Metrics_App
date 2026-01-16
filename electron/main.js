@@ -127,6 +127,9 @@ function createWindow() {
   });
   ipcMain.on('window-close', () => mainWindow.close());
 
+  // --- SISTEMA ---
+  ipcMain.handle('get-app-version', () => app.getVersion());
+
   // Carregamento
   if (!app.isPackaged) {
     console.log('--- [ELECTRON] Carregando URL de Desenvolvimento (Vite)...');

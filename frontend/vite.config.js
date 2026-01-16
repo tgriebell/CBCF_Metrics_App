@@ -6,6 +6,9 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 export default defineConfig({
   base: './',
   plugins: [ react(), basicSsl() ],
+  define: {
+    '__BUILD_DATE__': JSON.stringify(new Date().toLocaleDateString('pt-BR')),
+  },
   build: {
     minify: false, // DESLIGA MINIFICAÇÃO TOTALMENTE (Teste de Debug)
     terserOptions: {

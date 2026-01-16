@@ -988,15 +988,28 @@ async def analyze_patterns(platform: str = "youtube", user: models.User = Depend
 if __name__ == "__main__":
     import uvicorn
     import os
+    import sys
     
-    # Verifica se os certificados existem (Dev ou Prod)
-    key_file = "localhost+2-key.pem"
-    cert_file = "localhost+2.pem"
+    # Função para encontrar arquivos de recurso (funciona em dev e PyInstaller)
+    def resource_path(relative_path):
+        try:
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+            # Se estiver rodando do main.py, sobe um nível se os certs estiverem na raiz
+            if not os.path.exists(os.path.join(base_path, relative_path)):
+                base_path = os.path.dirname(base_path) 
+        return os.path.join(base_path, relative_path)
+
+    key_file = resource_path("localhost+2-key.pem")
+    cert_file = resource_path("localhost+2.pem")
     
-    # Se estiver rodando pelo PyInstaller, os arquivos podem estar na mesma pasta do executável
+    # Tenta rodar com SSL se encontrar os arquivos
     if os.path.exists(key_file) and os.path.exists(cert_file):
         print(f"Iniciando servidor seguro (HTTPS) na porta 8000...")
+        print(f"Certificados encontrados: {cert_file}")
         uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, ssl_keyfile=key_file, ssl_certfile=cert_file, reload=False)
     else:
-        print(f"AVISO: Certificados SSL não encontrados. Iniciando em HTTP (Inseguro) na porta 8000...")
-        uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=True)
+        # Fallback para HTTP (mas avisa que OAuth vai falhar)
+        print(f"AVISO: Certificados SSL não encontrados em {cert_file}. Iniciando em HTTP (Inseguro). OAuth pode falhar.")
+        uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=False)

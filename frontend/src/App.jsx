@@ -60,7 +60,7 @@ const TitleBar = () => (
   <div className="h-8 flex items-center justify-between px-3 bg-[#020715] border-b border-white/5 select-none fixed top-0 left-0 right-0 z-[9999]" style={{ WebkitAppRegion: 'drag' }}>
     <div className="flex items-center gap-2 pl-1">
       <div className="w-2 h-2 rounded-full bg-[#3bf5a5] shadow-[0_0_8px_#3bf5a5]"></div>
-      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest font-mono">CBCF System v1.0.9</span>
+      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest font-mono">CBCF System v1.1.0</span>
     </div>
     <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' }}>
       <button onClick={() => window.electron?.minimize()} className="p-1.5 hover:bg-white/10 rounded text-gray-500 hover:text-white transition-colors"><Minus size={10} /></button>
@@ -500,7 +500,19 @@ const LoginScreen = ({ onLogin }) => {
   const [user, setUser] = useState('admin');
   const [pass, setPass] = useState('cbcfsafe');
   const [error, setError] = useState('');
-  const lastUpdate = '08/01/2026 (v2.2)';
+  const [appVersion, setAppVersion] = useState('...');
+
+  useEffect(() => {
+    if (window.electron) {
+      window.electron.getAppVersion().then(v => setAppVersion(`v${v}`));
+    } else {
+      setAppVersion('v1.0.9 (Web)');
+    }
+  }, []);
+
+  // Usa a data injetada pelo Vite no momento do build
+  // eslint-disable-next-line no-undef
+  const buildDate = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : new Date().toLocaleDateString('pt-BR');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -556,7 +568,7 @@ const LoginScreen = ({ onLogin }) => {
         {/* 5B. Linha de status */}
         <div className="text-center mt-8">
           <p className="text-[10px] text-gray-600 font-semibold tracking-wider">
-            <span className="text-green-400/70">●</span> Sistema seguro • Última atualização: {lastUpdate}
+            <span className="text-green-400/70">●</span> Sistema seguro • {buildDate} ({appVersion})
           </p>
         </div>
       </section>
