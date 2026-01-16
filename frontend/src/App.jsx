@@ -60,7 +60,7 @@ const TitleBar = () => (
   <div className="h-8 flex items-center justify-between px-3 bg-[#020715] border-b border-white/5 select-none fixed top-0 left-0 right-0 z-[9999]" style={{ WebkitAppRegion: 'drag' }}>
     <div className="flex items-center gap-2 pl-1">
       <div className="w-2 h-2 rounded-full bg-[#3bf5a5] shadow-[0_0_8px_#3bf5a5]"></div>
-      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest font-mono">CBCF System v1.1.1</span>
+      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest font-mono">CBCF System v1.1.2</span>
     </div>
     <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' }}>
       <button onClick={() => window.electron?.minimize()} className="p-1.5 hover:bg-white/10 rounded text-gray-500 hover:text-white transition-colors"><Minus size={10} /></button>
@@ -171,14 +171,14 @@ const GlobalStyles = () => (
 
     @font-face {
       font-family: 'Helvetica Bold';
-      src: url('/fonts/helvetica-bold.otf') format('opentype');
+      src: url('./fonts/helvetica-bold.otf') format('opentype');
       font-weight: normal; /* TRUQUE: Define como normal para evitar "falso negrito" duplo do Windows */
       font-style: normal;
     }
 
     @font-face {
       font-family: 'Nexa Bold';
-      src: url('/fonts/nexa-bold.otf') format('opentype');
+      src: url('./fonts/nexa-bold.otf') format('opentype');
       font-weight: normal; /* TRUQUE: O arquivo já é bold, então tratamos como normal */
       font-style: normal;
     }
@@ -415,16 +415,34 @@ const SplashScreen = ({ onComplete }) => {
     if (window.electron) {
       console.log("--- [SPLASH] Modo Electron Detectado ---");
       
-      // 1. Escuta Status
+      // ANIMAÇÃO ORGÂNICA (FAKE LOADING)
+      // Roda independente dos eventos para dar sensação de vida
+      let currentFake = 0;
+      const fakeLoader = () => {
+          if (currentFake >= 90) return; // Trava em 90% esperando o sinal real
+          
+          let jump = Math.random() * 2;
+          if (currentFake > 30 && currentFake < 40) jump = 0.3; // Lento no meio
+          if (currentFake > 70) jump = 0.1; // Quase parando no final
+          
+          currentFake += jump;
+          // Só atualiza se o progresso real (de update) for menor
+          setProgress(prev => Math.max(prev, currentFake));
+          requestAnimationFrame(fakeLoader);
+      };
+      requestAnimationFrame(fakeLoader);
+
+      // 1. Escuta Status REAL do Electron
       window.electron.onUpdateStatus(({ status, msg }) => {
         console.log(`[UPDATE] Status: ${status} - ${msg}`);
         setStatusText(msg);
         
         if (status === 'checking') {
-             setProgress(10); // Feedback visual inicial
+             // Deixa o fake loader rodar
         }
         if (status === 'available') {
              setIsUpdating(true); // Bloqueia a entrada, vai atualizar
+             // A partir daqui, o progresso vem do download real
         }
         if (status === 'downloaded') {
              setProgress(100);
@@ -433,8 +451,9 @@ const SplashScreen = ({ onComplete }) => {
         }
       });
 
-      // 2. Escuta Progresso do Download
+      // 2. Escuta Progresso do Download REAL
       window.electron.onDownloadProgress((prog) => {
+        setIsUpdating(true);
         setProgress(prog);
         if (prog < 100) {
             setStatusText(`Baixando Atualização: ${Math.round(prog)}%`);
@@ -442,29 +461,37 @@ const SplashScreen = ({ onComplete }) => {
       });
 
       // 3. Fallback de Segurança (Caso não haja update, entra no app)
-      // Se em 8 segundos nada acontecer (sem update available), entra.
       const safetyTimer = setTimeout(() => {
-        if (!isUpdating && progress < 100) {
-            // Simula finalização rápida
-            setStatusText("Carregando Módulos...");
+        if (!isUpdating) {
+            setStatusText("Carregando Interface...");
             setProgress(100);
-            setTimeout(onComplete, 500);
+            setTimeout(onComplete, 800);
         }
-      }, 8000);
+      }, 5000); // 5 segundos é um tempo bom de splash
 
       return () => clearTimeout(safetyTimer);
 
     } else {
-      // --- MODO NAVEGADOR (Fallback Visual) ---
+      // --- MODO NAVEGADOR (Simulação Orgânica) ---
       let current = 0;
-      const interval = setInterval(() => {
-        const increment = Math.max(1, (100 - current) / 10); 
-        current += increment;
-        if (current >= 99) { current = 100; clearInterval(interval); }
-        setProgress(current);
-      }, 50);
-      const timer = setTimeout(onComplete, 3500);
-      return () => { clearTimeout(timer); clearInterval(interval); };
+      const simulateLoading = () => {
+          if (current >= 100) {
+             setProgress(100);
+             return;
+          }
+          
+          const remaining = 100 - current;
+          let jump = Math.random() * (remaining > 50 ? 5 : 2); 
+          if ((current > 30 && current < 35) || (current > 70 && current < 75)) jump = 0.2; 
+
+          current += jump;
+          setProgress(Math.min(current, 100));
+          requestAnimationFrame(simulateLoading);
+      };
+      
+      setTimeout(simulateLoading, 500);
+      const timer = setTimeout(onComplete, 4500); 
+      return () => clearTimeout(timer);
     }
   }, [onComplete, isUpdating]);
 
@@ -568,7 +595,7 @@ const LoginScreen = ({ onLogin }) => {
         {/* 5B. Linha de status */}
         <div className="text-center mt-8">
           <p className="text-[10px] text-gray-600 font-semibold tracking-wider">
-            <span className="text-green-400/70">●</span> Sistema seguro • {buildDate} ({appVersion})
+            <span className="text-green-400/70">●</span> Sistema seguro • Última atualização: {buildDate} ({appVersion})
           </p>
         </div>
       </section>

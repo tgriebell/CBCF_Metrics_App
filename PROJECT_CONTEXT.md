@@ -14,16 +14,14 @@ Aplicação Desktop (Electron + React) com Backend Python (FastAPI). Foco em an�
     *   Assistente de instalação visual (não mais silencioso) implementado.
     *   Inicialização do Electron (`main.js`) corrigida na v1.0.4.
 3.  **Assets:** Caminhos relativos configurados.
-### 🏆 Conquistas (Sessão Atual - v1.1.1)
-1.  **Estabilidade Visual e Funcional:**
-    *   **Tela Azul (Recharts) Resolvida:** Downgrade para v2.12.7 + limpeza de build Vite eliminou o erro crítico de inicialização.
-    *   **Visual Premium:** Implementado modo *Frameless* (sem moldura Windows) com barra de título customizada e funcional (Minimizar/Maximizar/Fechar).
-    *   **App Maximizado:** Configurado para iniciar em tela cheia.
-    *   **Versão e Data:** Tela de login agora mostra a versão real (`v1.1.1`) e a data de compilação congelada (`15/01/2026`).
-2.  **Infraestrutura e Conectividade (FIX CRÍTICO):**
-    *   **Correção de SSL no Executável:** Adicionada lógica de `sys._MEIPASS` no backend para encontrar certificados `.pem` e arquivo `.env` dentro do `.exe`.
-    *   **Build NSIS (main.spec):** Configurado para incluir arquivos de segurança no pacote final.
-    *   **Permissões Electron:** Adicionada flag `allow-insecure-localhost` para aceitar a conexão segura local.
+### 🏆 Conquistas (Sessão Atual - v1.1.2)
+1.  **Estabilidade Visual e UX:**
+    *   **Splash Screen Orgânico:** Implementada animação de carregamento fluida com "fake loading" para evitar saltos bruscos (0-100%).
+    *   **Correção de Assets:** Ajustados caminhos das fontes para modo relativo (`./fonts`), resolvendo erro de carregamento no executável.
+    *   **Interface:** Ajustado rodapé do login para exibir corretamente a data de última atualização.
+2.  **Infraestrutura e Diagnóstico:**
+    *   **Popup de Erro Backend:** Electron configurado para capturar e exibir erros críticos do Python em uma caixa de diálogo (ajuda no debug de produção).
+    *   **Versão v1.1.2:** Sincronizada em todos os metadados do projeto.
 
 ### 🚧 Status: Pronto para Teste de Produção 🚀
 1.  **Erro de Conexão (YouTube/TikTok):**
