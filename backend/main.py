@@ -137,7 +137,7 @@ app.add_middleware(
 def create_test_user():
     db = SessionLocal()
     if not db.query(models.User).filter(models.User.username == "testuser").first():
-        test_user = models.User(username="testuser", email="test@example.com", hashed_password="hashed_password")
+        test_user = models.User(username="testuser", hashed_password="hashed_password")
         db.add(test_user)
         db.commit()
         print("Test user 'testuser' created.")

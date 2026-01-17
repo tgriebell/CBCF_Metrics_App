@@ -3,17 +3,14 @@
 ## Visão Geral
 Aplicação Desktop (Electron + React) com Backend Python (FastAPI). Foco em análise estratégica de redes sociais para o Dr. Rafael Evaristo.
 
-## Status Atual: Infraestrutura Sólida, Pronto para v1.1.5 🚀
+## Status Atual: Infraestrutura Sólida, Pronto para v1.1.6 🚀
 
-### 🏆 Conquistas (v1.1.5)
-1.  **Login OAuth Profissional (Deep Linking):**
-    *   Protocolo `cbcfmetrics://` registrado e funcional.
-    *   Backend redireciona corretamente para o App Desktop.
-    *   Frontend configurado para ouvir o Deep Link.
-2.  **Instalador Premium (NSIS):**
-    *   Assistente de instalação visual (não mais silencioso) implementado.
-    *   Inicialização do Electron (`main.js`) corrigida na v1.0.4.
-3.  **Assets:** Caminhos relativos configurados.
+### 🏆 Conquistas (v1.1.6)
+1.  **Correção Crítica de Crash:** Removido campo inexistente `email` na criação de usuário (`main.py`) que impedia a inicialização do executável.
+2.  **Blindagem Total de Imports:** Implementada lógica híbrida em todos os serviços e adicionados *hidden imports* (uvicorn, sqlalchemy, sqlite3) no `main.spec`.
+3.  **Infraestrutura de Banco de Dados:** Banco SQLite agora é redirecionado automaticamente para `%APPDATA%` quando em modo executável.
+4.  **Instalação Moderna (One-Click):** Instalador configurado para modo rápido e limpo, sem wizard estilo Windows 98.
+
 ### 🏆 Conquistas (Sessão Atual - v1.1.4)
 1.  **Automação de Build Completa:**
     *   **Workflow unificado:** O comando `npm run dist` agora orquestra automaticamente o build do React, a compilação do Python via PyInstaller e o empacotamento final NSIS.

@@ -1,6 +1,6 @@
 {
   "name": "cbcf-metrics-app",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "description": "Painel de M�tricas e Metas CBCF",
   "main": "electron/main.js",
   "author": "Thiago Griebel",
@@ -42,13 +42,9 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "CBCF Metrics",
       "runAfterFinish": true,
       "installerIcon": "frontend/public/img/splash.ico",
       "uninstallerIcon": "frontend/public/img/splash.ico",
-      "installerHeaderIcon": "frontend/public/img/splash.ico",
       "deleteAppDataOnUninstall": true
     },
     "extraResources": [
