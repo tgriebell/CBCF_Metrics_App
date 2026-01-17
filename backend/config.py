@@ -15,6 +15,16 @@ class Settings(BaseSettings):
     # Base de Dados
     DATABASE_URL: str = "sqlite:///./cbcf_metrics.db"
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Se estiver rodando como executável (PyInstaller), forçar caminho gravável no APPDATA
+        if getattr(sys, 'frozen', False):
+            app_data = os.getenv('APPDATA')
+            if app_data:
+                db_dir = os.path.join(app_data, 'CBCF_Metrics')
+                os.makedirs(db_dir, exist_ok=True)
+                self.DATABASE_URL = f"sqlite:///{os.path.join(db_dir, 'cbcf_metrics.db')}"
+
     # === Configurações da API ===
     # Esta seção define as chaves e credenciais para as diversas APIs utilizadas.
     # O plano agora é utilizar a Google AI Gemini API (GEMINI_API_KEY) para todas as funcionalidades de IA.

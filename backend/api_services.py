@@ -12,11 +12,18 @@ import httplib2
 import certifi
 
 # Local imports
-from .config import get_settings
-from .models import Credential, Post # Import Credential from models.py
-from sqlalchemy.orm import Session # Import Session directly
-from .tiktok_service import TiktokApiService # Importa o novo serviço
-from .base_service import ApiService
+try:
+    from .config import get_settings
+    from .models import Credential, Post # Import Credential from models.py
+    from sqlalchemy.orm import Session # Import Session directly
+    from .tiktok_service import TiktokApiService # Importa o novo serviço
+    from .base_service import ApiService
+except ImportError:
+    from config import get_settings
+    from models import Credential, Post
+    from sqlalchemy.orm import Session
+    from tiktok_service import TiktokApiService
+    from base_service import ApiService
 
 settings = get_settings()
 
@@ -63,7 +70,11 @@ class YoutubeApiService(ApiService):
         """
         Busca estatísticas públicas de um vídeo do YouTube usando a API Key.
         """
-        from .utils import get_video_id_from_url # Importa o helper do novo módulo utils
+        try:
+            from .utils import get_video_id_from_url # Importa o helper do novo módulo utils
+        except ImportError:
+            from utils import get_video_id_from_url
+
         video_id = get_video_id_from_url(video_url)
         if not video_id:
             return {}

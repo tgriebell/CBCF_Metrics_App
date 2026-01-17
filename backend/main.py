@@ -1005,16 +1005,26 @@ if __name__ == "__main__":
     import os
     import sys
     
-    # Função para encontrar arquivos de recurso (funciona em dev e PyInstaller)
+    # Função robusta para encontrar arquivos de recurso (funciona em dev e PyInstaller)
     def resource_path(relative_path):
+        """ Get absolute path to resource, works for dev and for PyInstaller """
         try:
+            # PyInstaller creates a temp folder and stores path in _MEIPASS
             base_path = sys._MEIPASS
         except Exception:
             base_path = os.path.dirname(os.path.abspath(__file__))
-            # Se estiver rodando do main.py, sobe um nível se os certs estiverem na raiz
-            if not os.path.exists(os.path.join(base_path, relative_path)):
-                base_path = os.path.dirname(base_path) 
-        return os.path.join(base_path, relative_path)
+
+        # Se estiver rodando como script (dev), o arquivo pode estar na raiz ou na pasta backend
+        # Tenta na pasta atual (backend)
+        path = os.path.join(base_path, relative_path)
+        if not os.path.exists(path):
+            # Tenta um nível acima (raiz do projeto) se não estiver na pasta atual
+            parent_path = os.path.dirname(base_path)
+            path_parent = os.path.join(parent_path, relative_path)
+            if os.path.exists(path_parent):
+                return path_parent
+                
+        return path
 
     key_file = resource_path("localhost+2-key.pem")
     cert_file = resource_path("localhost+2.pem")

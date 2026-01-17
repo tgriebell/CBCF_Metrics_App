@@ -3,11 +3,18 @@ from datetime import datetime, timedelta
 import json
 import re
 from fastapi import HTTPException
-from .database import get_db
-from .models import Post, User, FollowerHistory, Conversation
-from .gemini_service import gemini_service
-from . import schemas
-from .api_services import YoutubeApiService 
+try:
+    from .database import get_db
+    from .models import Post, User, FollowerHistory, Conversation
+    from .gemini_service import gemini_service
+    from . import schemas
+    from .api_services import YoutubeApiService
+except ImportError:
+    from database import get_db
+    from models import Post, User, FollowerHistory, Conversation
+    from gemini_service import gemini_service
+    import schemas
+    from api_services import YoutubeApiService 
 
 class DataAnalyticsGeminiService:
 

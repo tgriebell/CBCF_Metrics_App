@@ -242,7 +242,10 @@ class TiktokApiService(ApiService):
             raise e
 
     def synchronize_posts(self, db: Session) -> dict:
-        from .models import Post
+        try:
+            from .models import Post
+        except ImportError:
+            from models import Post
         from datetime import datetime
         user_id = self.user_id 
         credential = db.query(Credential).filter(
@@ -344,7 +347,10 @@ class TiktokApiService(ApiService):
             return {"error": str(e)}
 
     def _calculate_daily_deltas(self, db: Session, user_id: int):
-        from .models import Post, FollowerHistory
+        try:
+            from .models import Post, FollowerHistory
+        except ImportError:
+            from models import Post, FollowerHistory
         from sqlalchemy import func
         from datetime import datetime, timedelta
 
@@ -396,8 +402,10 @@ class TiktokApiService(ApiService):
     def get_audience_data(self, db: Session):
         """Busca dados de seguidores e calcula crescimento mensal de likes."""
         from datetime import datetime, timedelta
-        from .models import Post
-        from .models import FollowerHistory
+        try:
+            from .models import Post, FollowerHistory
+        except ImportError:
+            from models import Post, FollowerHistory
         
         user_id = 1
         credential = db.query(Credential).filter(
@@ -509,7 +517,10 @@ class TiktokApiService(ApiService):
         Retorna métricas detalhadas do vídeo a partir do banco local.
         (Já sincronizamos tudo no video/list, não precisa chamar API de novo)
         """
-        from .models import Post
+        try:
+            from .models import Post
+        except ImportError:
+            from models import Post
         post = db.query(Post).filter(Post.platform_content_id == video_id).first()
         if not post: return {"error": "Vídeo não encontrado no banco."}
 

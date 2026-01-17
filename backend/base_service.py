@@ -1,7 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
-from .models import Credential
+
+try:
+    from .models import Credential
+except ImportError:
+    from models import Credential
 
 class ApiService(ABC):
     """
