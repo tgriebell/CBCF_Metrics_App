@@ -3,9 +3,9 @@
 ## Visão Geral
 Aplicação Desktop (Electron + React) com Backend Python (FastAPI). Foco em análise estratégica de redes sociais para o Dr. Rafael Evaristo.
 
-## Status Atual: Infraestrutura Sólida, Bug de Frontend em Prod 🚧
+## Status Atual: Infraestrutura Sólida, Pronto para v1.1.5 🚀
 
-### 🏆 Conquistas (Sessão Anterior)
+### 🏆 Conquistas (v1.1.5)
 1.  **Login OAuth Profissional (Deep Linking):**
     *   Protocolo `cbcfmetrics://` registrado e funcional.
     *   Backend redireciona corretamente para o App Desktop.
